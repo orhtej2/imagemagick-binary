@@ -1,156 +1,77 @@
-name: Build and Publish ImageMagick Binaries
+name: Build ImageMagick Binary
 
 on:
-  schedule:
-    # Run every 8 hours
-    - cron: '0 */8 * * *'
+  push:
+  pull_request:
   workflow_dispatch:
-    inputs:
-      force_build:
-        description: 'Force build even if tag exists'
-        required: false
-        default: false
-        type: boolean
-      release_tag:
-        description: 'Specific release tag to build (leave empty for latest)'
-        required: false
-        type: string
 
 jobs:
-  check-and-build:
+  build:
     runs-on: ubuntu-22.04
-    permissions:
-      contents: write
-    outputs:
-      should_build: ${{ steps.check-release.outputs.should_build }}
-      release_tag: ${{ steps.check-release.outputs.release_tag }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Check for new ImageMagick release
-        id: check-release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          FORCE_BUILD: ${{ github.event.inputs.force_build }}
-          MANUAL_TAG: ${{ github.event.inputs.release_tag }}
-        run: |
-          # Use manually specified tag if provided, otherwise get latest
-          if [ -n "$MANUAL_TAG" ]; then
-            LATEST_RELEASE="$MANUAL_TAG"
-            echo "Using manually specified release: $LATEST_RELEASE"
-          else
-            LATEST_RELEASE=$(gh api repos/ImageMagick/ImageMagick/releases/latest --jq '.tag_name' 2>/dev/null || echo "")
-          fi
-          
-          if [ -z "$LATEST_RELEASE" ]; then
-            echo "Failed to fetch latest release"
-            exit 1
-          fi
-          
-          echo "Latest ImageMagick release: $LATEST_RELEASE"
-          echo "release_tag=$LATEST_RELEASE" >> $GITHUB_OUTPUT
-          
-          # Check if tag exists in this repo
-          if git rev-parse "$LATEST_RELEASE" >/dev/null 2>&1; then
-            echo "Tag $LATEST_RELEASE already exists in this repo"
-            ARTIFACTS_EXIST=true
-            if [ "$ARTIFACTS_EXIST" = true ] && [ "$FORCE_BUILD" != "true" ]; then
-              echo "should_build=false" >> $GITHUB_OUTPUT
-              echo "All artifacts exist, skipping build"
-              exit 0
-            fi
-          fi
-          
-          echo "should_build=true" >> $GITHUB_OUTPUT
-
-  build-amd64:
-    needs: check-and-build
-    if: needs.check-and-build.outputs.should_build == 'true'
-    runs-on: ubuntu-22.04
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build ImageMagick for amd64
+      - name: Install dependencies
         run: |
-          chmod +x ./build.sh
-          ./build.sh ${{ needs.check-and-build.outputs.release_tag }} amd64
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential pkg-config autoconf automake libtool make \
+            liblcms2-dev liblqr-1-0-dev libopenexr-dev zlib1g-dev \
+            libjpeg-dev libpng-dev libtiff-dev libwebp-dev libxml2-dev
 
-      - name: Upload amd64 artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: imagemagick-amd64
-          path: build/imagemagick-*-linux-amd64.tar.gz
-          retention-days: 30
-
-  build-arm64:
-    needs: check-and-build
-    if: needs.check-and-build.outputs.should_build == 'true'
-    runs-on: ubuntu-22.04-arm
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Build ImageMagick for arm64
+      - name: Diagnose static libs (fail early if missing)
         run: |
-          chmod +x ./build.sh
-          ./build.sh ${{ needs.check-and-build.outputs.release_tag }} arm64
+          set -euxo pipefail
+          echo "Runner: $(lsb_release -ds || true)"
+          echo "Compiler:"; gcc --version | head -n1
+          echo "pkg-config static checks:"
+          pkg-config --modversion lcms2 || true
+          pkg-config --modversion liblqr-1 || true
+          pkg-config --modversion OpenEXR || true
+          echo "Looking for required static archives..."
+          for a in \
+            /usr/lib/x86_64-linux-gnu/liblcms2.a \
+            /usr/lib/x86_64-linux-gnu/liblqr-1.a
+          do
+            test -f "$a" || { echo "Missing static archive: $a"; exit 1; }
+            ls -l "$a"
+          done
 
-      - name: Upload arm64 artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: imagemagick-arm64
-          path: build/imagemagick-*-linux-arm64.tar.gz
-          retention-days: 30
+          echo "OpenEXR static archive discovery:"
+          ls -l /usr/lib/x86_64-linux-gnu/libIlmImf*.a || true
+          ls -l /usr/lib/x86_64-linux-gnu/libOpenEXR*.a || true
+          ls -l /usr/lib/x86_64-linux-gnu/libIex*.a || true
+          ls -l /usr/lib/x86_64-linux-gnu/libImath*.a || true
 
-  publish:
-    needs: [check-and-build, build-amd64, build-arm64]
-    if: needs.check-and-build.outputs.should_build == 'true'
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download amd64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: imagemagick-amd64
-          path: /tmp/artifacts
-
-      - name: Download arm64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: imagemagick-arm64
-          path: /tmp/artifacts
-
-      - name: Create release and upload artifacts
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Configure (prefer static)
         run: |
-          RELEASE_TAG="${{ needs.check-and-build.outputs.release_tag }}"
-          
-          # Check if release already exists
-          if gh release view "$RELEASE_TAG" &>/dev/null; then
-            echo "Release $RELEASE_TAG already exists, uploading artifacts..."
-            gh release upload "$RELEASE_TAG" /tmp/artifacts/* --clobber
-          else
-            echo "Creating new release $RELEASE_TAG..."
-            gh release create "$RELEASE_TAG" \
-              --title "ImageMagick $RELEASE_TAG" \
-              --notes "Built fully static self-contained binaries for ImageMagick $RELEASE_TAG on Ubuntu 22.04" \
-              /tmp/artifacts/*
+          set -euxo pipefail
+          export PKG_CONFIG="pkg-config --static"
+          export CFLAGS="-O2"
+          export CXXFLAGS="-O2"
+          export LDFLAGS="-static -Wl,-Bstatic"
+
+          # If your source tree is not repo root, cd there first.
+          ./configure \
+            --disable-shared \
+            --enable-static \
+            --with-lcms \
+            --with-lqr \
+            --without-openexr
+
+      - name: Build
+        run: |
+          set -euxo pipefail
+          make -j"$(nproc)"
+
+      - name: Linkage report
+        if: always()
+        run: |
+          set -euxo pipefail
+          if [ -f utilities/magick ]; then
+            file utilities/magick || true
+            ldd utilities/magick || true
           fi
-
-      - name: Create tag in this repository
-        if: success()
-        run: |
-          RELEASE_TAG="${{ needs.check-and-build.outputs.release_tag }}"
-          git tag "$RELEASE_TAG" || true
-          git push origin --tags || true
