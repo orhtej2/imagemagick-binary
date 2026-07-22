@@ -142,6 +142,7 @@ install_dependencies() {
         git \
         curl \
         wget \
+        gettext \
         autoconf \
         automake \
         libtool \
