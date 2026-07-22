@@ -1,36 +1,216 @@
-name: Build ImageMagick Binary
+name: Build and Publish ImageMagick Binaries
 
 'on':
-  pull_request:
+  schedule:
+    - cron: '0 */8 * * *'
   workflow_dispatch:
+    inputs:
+      force_build:
+        description: Force build even if the repo tag already exists
+        required: false
+        default: false
+        type: boolean
+      release_tag:
+        description: Specific ImageMagick tag to build (leave empty for latest)
+        required: false
+        type: string
 
 jobs:
-  build:
+  check-and-build:
     runs-on: ubuntu-22.04
-
+    permissions:
+      contents: read
+    outputs:
+      should_build: ${{ steps.check-release.outputs.should_build }}
+      release_tag: ${{ steps.check-release.outputs.release_tag }}
     steps:
-      - name: Checkout
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for new ImageMagick release
+        id: check-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE_BUILD: ${{ github.event.inputs.force_build || 'false' }}
+          MANUAL_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          set -euxo pipefail
+
+          if [ -n "$MANUAL_TAG" ]; then
+            RELEASE_TAG="$MANUAL_TAG"
+            echo "Using manually specified release: $RELEASE_TAG"
+          else
+            RELEASE_TAG="$(gh api repos/ImageMagick/ImageMagick/releases/latest --jq '.tag_name')"
+          fi
+
+          test -n "$RELEASE_TAG"
+          echo "Latest ImageMagick release: $RELEASE_TAG"
+          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Tag $RELEASE_TAG already exists in this repo"
+            if [ "$FORCE_BUILD" != "true" ]; then
+              echo "should_build=false" >> "$GITHUB_OUTPUT"
+              echo "Skipping build because the release tag already exists"
+              exit 0
+            fi
+          fi
+
+          echo "should_build=true" >> "$GITHUB_OUTPUT"
+
+  build-amd64:
+    needs: check-and-build
+    if: needs.check-and-build.outputs.should_build == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build latest static binary
+      - name: Build ImageMagick for amd64
         run: |
           set -euxo pipefail
           chmod +x ./build.sh
-          ./build.sh latest amd64
+          ./build.sh "${{ needs.check-and-build.outputs.release_tag }}" amd64
 
-      - name: Validate built artifacts
+      - name: Validate amd64 artifact
         run: |
           set -euxo pipefail
-          echo "Runner: $(lsb_release -ds || true)"
-          archive="$(ls -1 build/imagemagick-*-linux-amd64.tar.gz | head -n 1)"
-          test -n "$archive"
+          archive="build/imagemagick-${{ needs.check-and-build.outputs.release_tag }}-linux-amd64.tar.gz"
+          test -f "$archive"
           ls -lh "$archive"
 
-          temp_dir="$(mktemp -d)"
-          tar -xzf "$archive" -C "$temp_dir"
-          convert_bin="$(find "$temp_dir" -type f -path '*/bin/convert' | head -n 1)"
-          test -n "$convert_bin"
+      - name: Upload amd64 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: imagemagick-amd64
+          path: build/imagemagick-${{ needs.check-and-build.outputs.release_tag }}-linux-amd64.tar.gz
+          retention-days: 30
 
-          file "$convert_bin"
-          file "$convert_bin" | grep -q 'statically linked'
-          ldd "$convert_bin" || true
+  build-arm64:
+    needs: check-and-build
+    if: needs.check-and-build.outputs.should_build == 'true'
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build ImageMagick for arm64
+        run: |
+          set -euxo pipefail
+          chmod +x ./build.sh
+          ./build.sh "${{ needs.check-and-build.outputs.release_tag }}" arm64
+
+      - name: Validate arm64 artifact
+        run: |
+          set -euxo pipefail
+          archive="build/imagemagick-${{ needs.check-and-build.outputs.release_tag }}-linux-arm64.tar.gz"
+          test -f "$archive"
+          ls -lh "$archive"
+
+      - name: Upload arm64 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: imagemagick-arm64
+          path: build/imagemagick-${{ needs.check-and-build.outputs.release_tag }}-linux-arm64.tar.gz
+          retention-days: 30
+
+  publish:
+    needs: [check-and-build, build-amd64, build-arm64]
+    if: needs.check-and-build.outputs.should_build == 'true'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download amd64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: imagemagick-amd64
+          path: /tmp/artifacts/amd64
+
+      - name: Download arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: imagemagick-arm64
+          path: /tmp/artifacts/arm64
+
+      - name: Generate release BOM from dependencies.lock
+        run: |
+          set -euxo pipefail
+
+          RELEASE_TAG="${{ needs.check-and-build.outputs.release_tag }}"
+          BOM_FILE="/tmp/artifacts/imagemagick-${RELEASE_TAG}-dependencies.bom.txt"
+
+          # shellcheck source=/dev/null
+          source ./dependencies.lock
+
+          {
+            echo "ImageMagick Release BOM"
+            echo "Release tag: $RELEASE_TAG"
+            echo "Generated from: dependencies.lock"
+            echo
+            printf '%-18s %-60s %s\n' "Dependency" "Repository" "Tag"
+            printf '%-18s %-60s %s\n' "----------" "----------" "---"
+            printf '%-18s %-60s %s\n' "zlib" "$ZLIB_REPO" "$ZLIB_TAG"
+            printf '%-18s %-60s %s\n' "libjpeg-turbo" "$LIBJPEG_TURBO_REPO" "$LIBJPEG_TURBO_TAG"
+            printf '%-18s %-60s %s\n' "libpng" "$LIBPNG_REPO" "$LIBPNG_TAG"
+            printf '%-18s %-60s %s\n' "freetype" "$FREETYPE_REPO" "$FREETYPE_TAG"
+            printf '%-18s %-60s %s\n' "harfbuzz" "$HARFBUZZ_REPO" "$HARFBUZZ_TAG"
+            printf '%-18s %-60s %s\n' "libwebp" "$LIBWEBP_REPO" "$LIBWEBP_TAG"
+            printf '%-18s %-60s %s\n' "libtiff" "$LIBTIFF_REPO" "$LIBTIFF_TAG"
+            printf '%-18s %-60s %s\n' "fontconfig" "$FONTCONFIG_REPO" "$FONTCONFIG_TAG"
+            echo
+            echo "Raw lock file contents:"
+            cat ./dependencies.lock
+          } > "$BOM_FILE"
+
+          ls -lh "$BOM_FILE"
+
+      - name: Create tag in this repository
+        run: |
+          set -euxo pipefail
+
+          RELEASE_TAG="${{ needs.check-and-build.outputs.release_tag }}"
+
+          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Tag $RELEASE_TAG already exists"
+            exit 0
+          fi
+
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git tag -a "$RELEASE_TAG" -m "ImageMagick $RELEASE_TAG"
+          git push origin "refs/tags/$RELEASE_TAG"
+
+      - name: Create release and upload artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+
+          RELEASE_TAG="${{ needs.check-and-build.outputs.release_tag }}"
+          AMD64_ARCHIVE="/tmp/artifacts/amd64/imagemagick-${RELEASE_TAG}-linux-amd64.tar.gz"
+          ARM64_ARCHIVE="/tmp/artifacts/arm64/imagemagick-${RELEASE_TAG}-linux-arm64.tar.gz"
+          BOM_FILE="/tmp/artifacts/imagemagick-${RELEASE_TAG}-dependencies.bom.txt"
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" \
+              "$AMD64_ARCHIVE" \
+              "$ARM64_ARCHIVE" \
+              "$BOM_FILE" \
+              --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              --verify-tag \
+              --title "ImageMagick $RELEASE_TAG" \
+              --notes "Built fully static self-contained binaries for ImageMagick $RELEASE_TAG." \
+              "$AMD64_ARCHIVE" \
+              "$ARM64_ARCHIVE" \
+              "$BOM_FILE"
+          fi
