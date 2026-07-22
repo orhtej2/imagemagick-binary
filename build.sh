@@ -153,7 +153,8 @@ install_dependencies() {
         python3-pip \
         meson \
         ninja-build \
-        gperf
+        gperf \
+        autopoint
     
     log_info "Build dependencies installed successfully"
 }
