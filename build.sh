@@ -109,6 +109,13 @@ build_png() {
     fi
     
     cd libpng
+    
+    # Generate configure script if it doesn't exist
+    if [ ! -f "configure" ]; then
+        log_info "Generating libpng configure script..."
+        ./autogen.sh
+    fi
+    
     ./configure --prefix="$PREFIX" \
                 --disable-shared \
                 --enable-static \
@@ -127,7 +134,13 @@ build_freetype() {
     fi
     
     cd freetype
-    ./autogen.sh
+    
+    # Generate configure script if it doesn't exist
+    if [ ! -f "configure" ]; then
+        log_info "Generating freetype configure script..."
+        ./autogen.sh
+    fi
+    
     ./configure --prefix="$PREFIX" \
                 --disable-shared \
                 --enable-static \
@@ -146,7 +159,13 @@ build_webp() {
     fi
     
     cd libwebp
-    ./autogen.sh
+    
+    # Generate configure script if it doesn't exist
+    if [ ! -f "configure" ]; then
+        log_info "Generating libwebp configure script..."
+        ./autogen.sh
+    fi
+    
     ./configure --prefix="$PREFIX" \
                 --disable-shared \
                 --enable-static
@@ -164,7 +183,13 @@ build_tiff() {
     fi
     
     cd libtiff
-    ./autogen.sh
+    
+    # Generate configure script if it doesn't exist
+    if [ ! -f "configure" ]; then
+        log_info "Generating libtiff configure script..."
+        ./autogen.sh
+    fi
+    
     ./configure --prefix="$PREFIX" \
                 --disable-shared \
                 --enable-static \
@@ -186,7 +211,13 @@ build_fontconfig() {
     fi
     
     cd fontconfig
-    ./autogen.sh
+    
+    # Generate configure script if it doesn't exist
+    if [ ! -f "configure" ]; then
+        log_info "Generating fontconfig configure script..."
+        ./autogen.sh
+    fi
+    
     ./configure --prefix="$PREFIX" \
                 --disable-shared \
                 --enable-static \
