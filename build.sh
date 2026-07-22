@@ -302,15 +302,16 @@ build_imagemagick() {
     export CFLAGS="-O2"
     export CXXFLAGS="-O2"
     
-    log_info "Running configure with full static linking..."
+    log_info "Running configure with full static linking (core utilities only)..."
     ./configure \
         --prefix="$PREFIX/imagemagick" \
         --enable-static \
         --disable-shared \
         --disable-ltdl-install \
+        --disable-magick-plus-plus \
+        --disable-perl \
         --with-quantum-depth=16 \
         --enable-hdri \
-        --with-magick-plus-plus \
         --with-zlib="$PREFIX" \
         --with-jpeg="$PREFIX" \
         --with-png="$PREFIX" \
@@ -326,7 +327,7 @@ build_imagemagick() {
     make -j$(nproc) LDFLAGS="-all-static -L$PREFIX/lib -L$PREFIX/lib64"
     
     log_info "Installing..."
-    make install DESTDIR=""
+    make install
     
     cd "$WORK_DIR"
 }
@@ -364,12 +365,12 @@ optimize_binaries() {
     log_info "Binary optimization complete"
 }
 
-# Function to create portable tarball
+# Function to create portable tarball (core utilities only)
 create_portable_tarball() {
     local tag=$1
     local arch=$2
     
-    log_info "Creating portable tarball with fully static binaries..."
+    log_info "Creating portable tarball with fully static core utilities..."
     
     mkdir -p "$BUILD_DIR"
     
@@ -378,14 +379,25 @@ create_portable_tarball() {
     rm -rf "$temp_dir"
     mkdir -p "$temp_dir/imagemagick-${tag}-${arch}"
     
-    # Copy only binaries (no libs needed!)
-    cp -r "$PREFIX/imagemagick/bin" "$temp_dir/imagemagick-${tag}-${arch}/" || true
+    # Copy core utilities (magick binary and scripts)
+    local bin_dir="$PREFIX/imagemagick/bin"
+    local core_utils=("convert" "identify" "display" "animate" "composite" "mogrify" "compare" "magick")
+    
+    mkdir -p "$temp_dir/imagemagick-${tag}-${arch}/bin"
+    
+    # Copy available core utilities only
+    for util in "${core_utils[@]}"; do
+        if [ -f "$bin_dir/$util" ]; then
+            cp "$bin_dir/$util" "$temp_dir/imagemagick-${tag}-${arch}/bin/"
+            log_info "Included: $util"
+        fi
+    done
     
     # Create README with installation and usage info
     cat > "$temp_dir/imagemagick-${tag}-${arch}/README.md" << 'EOF'
 # ImageMagick Fully Static Portable Build
 
-This is a completely self-contained build of ImageMagick with ALL dependencies statically linked into single binaries.
+This is a completely self-contained build of ImageMagick core utilities with ALL dependencies statically linked into single binaries.
 
 ## No External Dependencies Required!
 
@@ -418,16 +430,16 @@ sudo cp bin/* /usr/local/bin/
 ./bin/identify image.jpg
 ```
 
-## Included Binaries
+## Core Utilities
 
-- `convert` - Image conversion tool
-- `identify` - Image information tool
-- `display` - Image display tool
+- `magick` - Main ImageMagick utility
+- `convert` - Image conversion and manipulation
+- `identify` - Image information
+- `display` - Image display
 - `animate` - Animation tool
-- `composite` - Image composition tool
-- `mogrify` - In-place image modification tool
-- `compare` - Image comparison tool
-- And more...
+- `composite` - Image composition
+- `mogrify` - In-place image modification
+- `compare` - Image comparison
 
 ## Usage Examples
 
@@ -449,6 +461,9 @@ sudo cp bin/* /usr/local/bin/
 
 # Rotate image
 ./bin/convert input.jpg -rotate 90 rotated.jpg
+
+# Composite images
+./bin/composite foreground.png background.png result.png
 ```
 
 ## Requirements
@@ -461,7 +476,7 @@ sudo cp bin/* /usr/local/bin/
 
 ## Binary Size
 
-Single binary includes all functionality. Typically 15-25MB per tool.
+Single binary includes all functionality. Typically 8-15MB per utility.
 
 ## Verification
 
@@ -485,8 +500,8 @@ EOF
     ls -lh "${BUILD_DIR}/imagemagick-${tag}-linux-${arch}.tar.gz"
     
     # Verify contents
-    log_info "Tarball contents (binaries only):"
-    tar -tzf "${BUILD_DIR}/imagemagick-${tag}-linux-${arch}.tar.gz" | head -20
+    log_info "Tarball contents (core utilities only):"
+    tar -tzf "${BUILD_DIR}/imagemagick-${tag}-linux-${arch}.tar.gz"
 }
 
 # Function to display usage
@@ -494,8 +509,8 @@ usage() {
     cat << EOF
 ImageMagick Fully Static Self-Contained Build Script
 
-Builds ImageMagick with ALL dependencies statically linked into single binaries.
-No external dependencies, no .so files, completely portable.
+Builds ImageMagick core utilities with ALL dependencies statically linked into single binaries.
+No external dependencies, no .so files, no bindings, completely portable.
 
 Usage: ./build.sh [OPTIONS]
 
@@ -530,21 +545,24 @@ Build Process:
     6. Builds libwebp statically (autotools)
     7. Builds libtiff statically (autotools)
     8. Builds fontconfig statically (autotools)
-    9. Builds ImageMagick statically with all dependencies
+    9. Builds ImageMagick core utilities statically with all dependencies
 
 Features:
     ✓ Fully static binaries - everything embedded
     ✓ Zero external dependencies
     ✓ No .so files - just executables
+    ✓ No C++ bindings (Magick++)
+    ✓ No Perl bindings
+    ✓ Core utilities only (convert, identify, etc.)
     ✓ Portable across all Linux systems
-    ✓ Single binary per tool (~15-25MB)
+    ✓ Single binary per utility (~8-15MB)
     ✓ Automatic verification of static linking
 
 Notes:
     - Requires Ubuntu 22.04 or similar Debian-based system
     - First build will take significant time (~45-90 minutes)
     - Subsequent builds are faster due to cached dependencies
-    - Binaries can be very large (~15-25MB per tool)
+    - Binaries are smaller (~8-15MB per tool vs 15-25MB with bindings)
     
 To clean up build artifacts:
     rm -rf build-work/
@@ -563,7 +581,7 @@ trap cleanup_on_error ERR
 
 # Main script
 main() {
-    log_info "ImageMagick Fully Static Self-Contained Build"
+    log_info "ImageMagick Fully Static Core Utilities Build"
     log_info "Tag: $RELEASE_TAG, Architecture: $TARGET_ARCH"
     
     # Validate architecture
