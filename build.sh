@@ -17,11 +17,17 @@ TARGET_ARCH="${2:-$(uname -m)}"
 WORK_DIR="${PWD}/build-work"
 BUILD_DIR="${PWD}/build"
 PREFIX="${WORK_DIR}/install"
+LOCK_FILE="${PWD}/dependencies.lock"
+HOST_MULTIARCH="$(gcc -dumpmachine 2>/dev/null || true)"
 PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig"
+
+if [ -n "$HOST_MULTIARCH" ]; then
+    PKG_CONFIG_PATH="$PKG_CONFIG_PATH:$PREFIX/lib/$HOST_MULTIARCH/pkgconfig"
+fi
 
 export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}"
 export CPPFLAGS="-I$PREFIX/include"
-export LD_LIBRARY_PATH="$PREFIX/lib:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="$PREFIX/lib${HOST_MULTIARCH:+:$PREFIX/lib/$HOST_MULTIARCH}:$LD_LIBRARY_PATH"
 
 # Additional compiler flags for full static linking
 export CFLAGS="-O2"
@@ -47,6 +53,79 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+sanitize_no_werror_flags() {
+    local input_flags="$1"
+    local sanitized_flags=()
+    local flag
+
+    for flag in $input_flags; do
+        if [[ "$flag" == -Werror* ]]; then
+            continue
+        fi
+        sanitized_flags+=("$flag")
+    done
+
+    echo "${sanitized_flags[*]}"
+}
+
+compiler_supports_flag() {
+    local flag="$1"
+    local cc_bin="${CC:-gcc}"
+
+    printf 'int main(void){return 0;}\n' | "$cc_bin" "$flag" -x c -c -o /dev/null - >/dev/null 2>&1
+}
+
+load_dependency_lock() {
+    if [ ! -f "$LOCK_FILE" ]; then
+        log_error "Dependency lock file not found: $LOCK_FILE"
+        exit 1
+    fi
+
+    # shellcheck source=/dev/null
+    source "$LOCK_FILE"
+
+    local required_vars=(
+        ZLIB_REPO ZLIB_TAG
+        LIBJPEG_TURBO_REPO LIBJPEG_TURBO_TAG
+        LIBPNG_REPO LIBPNG_TAG
+        FREETYPE_REPO FREETYPE_TAG
+        HARFBUZZ_REPO HARFBUZZ_TAG
+        LIBWEBP_REPO LIBWEBP_TAG
+        LIBTIFF_REPO LIBTIFF_TAG
+        FONTCONFIG_REPO FONTCONFIG_TAG
+    )
+
+    local missing=0
+    for var_name in "${required_vars[@]}"; do
+        if [ -z "${!var_name}" ]; then
+            log_error "Missing '$var_name' in dependency lock file"
+            missing=1
+        fi
+    done
+    if [ "$missing" -ne 0 ]; then
+        exit 1
+    fi
+}
+
+checkout_repo_tag() {
+    local repo_dir="$1"
+    local repo_url="$2"
+    local repo_tag="$3"
+
+    if [ -d "$repo_dir/.git" ]; then
+        log_info "Updating $repo_dir to tag $repo_tag"
+        git -C "$repo_dir" remote set-url origin "$repo_url"
+        git -C "$repo_dir" fetch --depth 1 origin "refs/tags/$repo_tag:refs/tags/$repo_tag" || \
+            git -C "$repo_dir" fetch --depth 1 origin "$repo_tag"
+    else
+        rm -rf "$repo_dir"
+        log_info "Cloning $repo_dir at tag $repo_tag"
+        git clone --depth 1 --branch "$repo_tag" "$repo_url" "$repo_dir"
+    fi
+
+    git -C "$repo_dir" checkout -f "$repo_tag"
+}
+
 # Function to install build dependencies
 install_dependencies() {
     log_info "Installing build dependencies..."
@@ -56,24 +135,24 @@ install_dependencies() {
         exit 1
     fi
     
-    sudo apt-get update
-    sudo apt-get install -y \
-        build-essential \
-        pkg-config \
-        git \
-        curl \
-        wget \
-        autoconf \
-        automake \
-        libtool \
-        cmake \
-        nasm \
-        perl \
-        python3 \
-        python3-pip \
-        meson \
-        ninja-build \
-        gperf
+    # sudo apt-get update
+    # sudo apt-get install -y \
+    #     build-essential \
+    #     pkg-config \
+    #     git \
+    #     curl \
+    #     wget \
+    #     autoconf \
+    #     automake \
+    #     libtool \
+    #     cmake \
+    #     nasm \
+    #     perl \
+    #     python3 \
+    #     python3-pip \
+    #     meson \
+    #     ninja-build \
+    #     gperf
     
     log_info "Build dependencies installed successfully"
 }
@@ -82,13 +161,13 @@ install_dependencies() {
 build_zlib() {
     log_info "Building zlib (static)..."
     cd "$WORK_DIR"
-    
-    if [ ! -d "zlib" ]; then
-        git clone --depth 1 https://github.com/madler/zlib.git
-    fi
-    
+
+    checkout_repo_tag "zlib" "$ZLIB_REPO" "$ZLIB_TAG"
+
     cd zlib
-    ./configure --static --prefix="$PREFIX"
+    local zlib_cflags
+    zlib_cflags="$(sanitize_no_werror_flags "$CFLAGS") -Wno-error"
+    CFLAGS="$zlib_cflags" ./configure --static --prefix="$PREFIX"
     make -j$(nproc)
     make install
     cd ..
@@ -97,11 +176,9 @@ build_zlib() {
 build_jpeg() {
     log_info "Building libjpeg-turbo (static)..."
     cd "$WORK_DIR"
-    
-    if [ ! -d "libjpeg-turbo" ]; then
-        git clone --depth 1 https://github.com/libjpeg-turbo/libjpeg-turbo.git
-    fi
-    
+
+    checkout_repo_tag "libjpeg-turbo" "$LIBJPEG_TURBO_REPO" "$LIBJPEG_TURBO_TAG"
+
     cd libjpeg-turbo
     mkdir -p build
     cd build
@@ -118,16 +195,14 @@ build_jpeg() {
 build_png() {
     log_info "Building libpng (static)..."
     cd "$WORK_DIR"
-    
-    if [ ! -d "libpng" ]; then
-        git clone --depth 1 https://github.com/glennrp/libpng.git
-    fi
-    
+
+    checkout_repo_tag "libpng" "$LIBPNG_REPO" "$LIBPNG_TAG"
+
     cd libpng
     
     # Generate configure script if it doesn't exist
-    log_info "Generating libpng configure script..."
-    ./autogen.sh
+    # log_info "Generating libpng configure script..."
+    # ./autogen.sh
     
     ./configure --prefix="$PREFIX" \
                 --disable-shared \
@@ -139,57 +214,81 @@ build_png() {
 }
 
 build_freetype() {
-    log_info "Building freetype (static)..."
-    cd "$WORK_DIR"
-    
-    if [ ! -d "freetype" ]; then
-        # Try GNU savannah first, fall back to GitHub
-        git clone --depth 1 https://git.savannah.gnu.org/git/freetype/freetype2.git freetype 2>/dev/null || \
-        git clone --depth 1 https://github.com/freetype/freetype.git freetype
+    local enable_harfbuzz="${1:-false}"
+
+    if [ "$enable_harfbuzz" = "true" ]; then
+        log_info "Building freetype (static, with harfbuzz)..."
+    else
+        log_info "Building freetype (static, without harfbuzz)..."
     fi
+
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "freetype" "$FREETYPE_REPO" "$FREETYPE_TAG"
     
     cd freetype
+
+    # Clean previous build state so the second pass can pick up HarfBuzz.
+    if [ -f "Makefile" ]; then
+        make distclean >/dev/null 2>&1 || true
+    fi
     
-    # Freetype 2.13+ uses meson, older versions use autotools
-    # if [ -f "meson.build" ]; then
-    #     log_info "Building freetype with meson (v2.13+)..."
-    #     mkdir -p build
-    #     cd build
-    #     meson setup --prefix="$PREFIX" \
-    #                 --default-library=static \
-    #                 --buildtype=release \
-    #                 -Dbzip2=disabled \
-    #                 -Dharfbuzz=disabled \
-    #                 -Dmmap=enabled \
-    #                 ..
-    #     ninja
-    #     ninja install
-    #     cd ..
-    # else
-        # Fall back to autotools for older versions
-        log_info "Building freetype with autotools (older versions)..."
-        log_info "Generating freetype configure script..."
-        ./autogen.sh
-        
-        ./configure --prefix="$PREFIX" \
-                    --disable-shared \
-                    --enable-static \
-                    --with-zlib-prefix="$PREFIX"
-        make -j$(nproc)
-        make install
-    # fi
+    # Fall back to autotools for older versions
+    log_info "Building freetype with autotools (older versions)..."
+    log_info "Generating freetype configure script..."
+    ./autogen.sh
+
+    local harfbuzz_flag="--without-harfbuzz"
+    if [ "$enable_harfbuzz" = "true" ]; then
+        harfbuzz_flag="--with-harfbuzz=yes"
+    fi
     
+    ./configure --prefix="$PREFIX" \
+                --disable-shared \
+                --enable-static \
+                "$harfbuzz_flag" \
+                --with-zlib-prefix="$PREFIX"
+    make -j$(nproc)
+    make install
+    
+    cd ..
+}
+
+build_harfbuzz() {
+    log_info "Building harfbuzz (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "harfbuzz" "$HARFBUZZ_REPO" "$HARFBUZZ_TAG"
+
+    cd harfbuzz
+
+    rm -rf build
+    meson setup build \
+        --prefix="$PREFIX" \
+        --libdir=lib \
+        --default-library=static \
+        --buildtype=release \
+        -Dtests=disabled \
+        -Ddocs=disabled \
+        -Dintrospection=disabled \
+        -Dglib=disabled \
+        -Dgobject=disabled \
+        -Dcairo=disabled \
+        -Dicu=disabled \
+        -Dgraphite=disabled \
+        -Dfreetype=enabled
+    ninja -C build
+    ninja -C build install
+
     cd ..
 }
 
 build_webp() {
     log_info "Building libwebp (static)..."
     cd "$WORK_DIR"
-    
-    if [ ! -d "libwebp" ]; then
-        git clone --depth 1 https://github.com/webmproject/libwebp.git
-    fi
-    
+
+    checkout_repo_tag "libwebp" "$LIBWEBP_REPO" "$LIBWEBP_TAG"
+
     cd libwebp
     
     # Generate configure script if it doesn't exist
@@ -209,11 +308,9 @@ build_webp() {
 build_tiff() {
     log_info "Building libtiff (static)..."
     cd "$WORK_DIR"
-    
-    if [ ! -d "libtiff" ]; then
-        git clone --depth 1 https://gitlab.com/libtiff/libtiff.git
-    fi
-    
+
+    checkout_repo_tag "libtiff" "$LIBTIFF_REPO" "$LIBTIFF_TAG"
+
     cd libtiff
     
     # Generate configure script if it doesn't exist
@@ -237,11 +334,9 @@ build_tiff() {
 build_fontconfig() {
     log_info "Building fontconfig (static)..."
     cd "$WORK_DIR"
-    
-    if [ ! -d "fontconfig" ]; then
-        git clone --depth 1 https://gitlab.freedesktop.org/fontconfig/fontconfig.git
-    fi
-    
+
+    checkout_repo_tag "fontconfig" "$FONTCONFIG_REPO" "$FONTCONFIG_TAG"
+
     cd fontconfig
     
     # Generate configure script if it doesn't exist
@@ -298,9 +393,17 @@ build_imagemagick() {
     log_info "Building ImageMagick with ALL dependencies statically linked..."
     
     cd "$WORK_DIR/ImageMagick"
+
+    # Ensure delegate/config changes take effect on repeat builds.
+    if [ -f "Makefile" ]; then
+        make distclean >/dev/null 2>&1 || true
+    fi
     
     # Export library paths - force static linking
     export LDFLAGS="-static -static-libgcc -L$PREFIX/lib"
+
+    # Avoid stale tools from previous runs (for example Magick++-config).
+    rm -rf "$PREFIX/imagemagick"
     
     log_info "Running configure with full static linking (core utilities only)..."
     ./configure \
@@ -310,6 +413,8 @@ build_imagemagick() {
         --disable-ltdl-install \
         --disable-magick-plus-plus \
         --disable-perl \
+        --without-xml \
+        --disable-openmp \
         --with-quantum-depth=16 \
         --enable-hdri \
         --with-zlib="$PREFIX" \
@@ -328,6 +433,9 @@ build_imagemagick() {
     
     log_info "Installing..."
     make install
+
+    # Keep only runtime utilities in this build output.
+    find "$PREFIX/imagemagick/bin" -maxdepth 1 -type f -name '*-config' -delete 2>/dev/null || true
     
     cd "$WORK_DIR"
 }
@@ -339,11 +447,22 @@ verify_static() {
     local bin_dir="$PREFIX/imagemagick/bin"
     local static_count=0
     local dynamic_count=0
+    local inspected_binary
     
     for binary in "$bin_dir"/*; do
         if [ -f "$binary" ] && [ -x "$binary" ]; then
+            # Config helper scripts are not runtime binaries and can be skipped.
+            if [[ "$(basename "$binary")" == *-config ]]; then
+                continue
+            fi
+
+            inspected_binary="$binary"
+            if [ -L "$binary" ]; then
+                inspected_binary="$(readlink -f "$binary")"
+            fi
+
             # Use file command to check if static
-            if file "$binary" | grep -q "statically linked"; then
+            if file "$inspected_binary" | grep -q "statically linked"; then
                 log_info "✓ $(basename $binary) is fully static"
                 ((static_count++))
             else
@@ -406,6 +525,7 @@ This build includes everything needed:
 - libjpeg-turbo
 - libpng
 - freetype
+- harfbuzz
 - libwebp
 - libtiff
 - fontconfig
@@ -535,21 +655,25 @@ Output:
     - Portable tarball: build/imagemagick-<tag>-linux-<arch>.tar.gz
     - Build directory: build-work/
     - Installed at: build-work/install/imagemagick/bin/
+    - Dependency lock file: dependencies.lock
 
 Build Process:
     1. Installs build dependencies (autoconf, cmake, meson, ninja, etc.)
     2. Builds zlib statically
     3. Builds libjpeg-turbo statically (cmake)
     4. Builds libpng statically (autotools)
-    5. Builds freetype statically (meson v2.13+ or autotools older)
-    6. Builds libwebp statically (autotools)
-    7. Builds libtiff statically (autotools)
-    8. Builds fontconfig statically (autotools)
-    9. Builds ImageMagick core utilities statically with all dependencies
+    5. Builds freetype statically (pass 1, without harfbuzz)
+    6. Builds harfbuzz statically
+    7. Rebuilds freetype statically (pass 2, with harfbuzz)
+    8. Builds libwebp statically (autotools)
+    9. Builds libtiff statically (autotools)
+    10. Builds fontconfig statically (autotools)
+    11. Builds ImageMagick core utilities statically with all dependencies
 
 Features:
     ✓ Fully static binaries - everything embedded
     ✓ Zero external dependencies
+    ✓ Dependencies pinned to committed tags in dependencies.lock
     ✓ No .so files - just executables
     ✓ No C++ bindings (Magick++)
     ✓ No Perl bindings
@@ -583,6 +707,8 @@ trap cleanup_on_error ERR
 main() {
     log_info "ImageMagick Fully Static Core Utilities Build"
     log_info "Tag: $RELEASE_TAG, Architecture: $TARGET_ARCH"
+
+    load_dependency_lock
     
     # Validate architecture
     case $TARGET_ARCH in
@@ -598,6 +724,26 @@ main() {
             exit 1
             ;;
     esac
+
+    # Use baseline CPU targets for portable binaries.
+    local arch_cflags
+    case $TARGET_ARCH in
+        amd64)
+            if compiler_supports_flag "-march=x86-64-v1"; then
+                arch_cflags="-march=x86-64-v1 -mtune=generic"
+            else
+                log_warn "Compiler does not support -march=x86-64-v1; falling back to -march=x86-64"
+                arch_cflags="-march=x86-64 -mtune=generic"
+            fi
+            ;;
+        arm64)
+            arch_cflags="-march=armv8-a"
+            ;;
+    esac
+
+    export CFLAGS="-O2 $arch_cflags"
+    export CXXFLAGS="-O2 $arch_cflags"
+    log_info "Compiler baseline flags: CFLAGS='$CFLAGS' CXXFLAGS='$CXXFLAGS'"
     
     # Check if running on ARM but targeting AMD64 (or vice versa)
     CURRENT_ARCH=$(uname -m)
@@ -627,7 +773,9 @@ main() {
     build_zlib
     build_jpeg
     build_png
-    build_freetype
+    build_freetype false
+    build_harfbuzz
+    build_freetype true
     build_webp
     build_tiff
     build_fontconfig

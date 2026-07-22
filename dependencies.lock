@@ -1,0 +1,26 @@
+# Pinned dependency sources and tags for build.sh
+# Update with: scripts/update-dependency-lock.sh
+
+ZLIB_REPO="https://github.com/madler/zlib.git"
+ZLIB_TAG="v1.3.2"
+
+LIBJPEG_TURBO_REPO="https://github.com/libjpeg-turbo/libjpeg-turbo.git"
+LIBJPEG_TURBO_TAG="3.2.0"
+
+LIBPNG_REPO="https://github.com/glennrp/libpng.git"
+LIBPNG_TAG="v1.6.58"
+
+FREETYPE_REPO="https://github.com/freetype/freetype.git"
+FREETYPE_TAG="VER-2-14-3"
+
+HARFBUZZ_REPO="https://github.com/harfbuzz/harfbuzz.git"
+HARFBUZZ_TAG="14.2.1"
+
+LIBWEBP_REPO="https://github.com/webmproject/libwebp.git"
+LIBWEBP_TAG="v1.6.0"
+
+LIBTIFF_REPO="https://gitlab.com/libtiff/libtiff.git"
+LIBTIFF_TAG="v4.7.2"
+
+FONTCONFIG_REPO="https://gitlab.freedesktop.org/fontconfig/fontconfig.git"
+FONTCONFIG_TAG="2.18.2"
