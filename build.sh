@@ -25,7 +25,13 @@ if [ -n "$HOST_MULTIARCH" ]; then
     PKG_CONFIG_PATH="$PKG_CONFIG_PATH:$PREFIX/lib/$HOST_MULTIARCH/pkgconfig"
 fi
 
+# Keep pkg-config isolated from host metadata so ImageMagick only enables
+# delegates that this script actually built into the local prefix.
+PKG_CONFIG_LIBDIR="$PKG_CONFIG_PATH"
+
 export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}"
+export PKG_CONFIG_LIBDIR="${PKG_CONFIG_LIBDIR}"
+export PKG_CONFIG_DIR=""
 export CPPFLAGS="-I$PREFIX/include"
 export LD_LIBRARY_PATH="$PREFIX/lib${HOST_MULTIARCH:+:$PREFIX/lib/$HOST_MULTIARCH}:$LD_LIBRARY_PATH"
 

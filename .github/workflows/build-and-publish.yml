@@ -1,6 +1,6 @@
 name: Build ImageMagick Binary
 
-on:
+'on':
   push:
   pull_request:
   workflow_dispatch:
@@ -13,65 +13,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Build latest static binary
         run: |
           set -euxo pipefail
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential pkg-config autoconf automake libtool make \
-            liblcms2-dev liblqr-1-0-dev libopenexr-dev zlib1g-dev \
-            libjpeg-dev libpng-dev libtiff-dev libwebp-dev libxml2-dev
+          chmod +x ./build.sh
+          ./build.sh latest amd64
 
-      - name: Diagnose static libs (fail early if missing)
+      - name: Validate built artifacts
         run: |
           set -euxo pipefail
           echo "Runner: $(lsb_release -ds || true)"
-          echo "Compiler:"; gcc --version | head -n1
-          echo "pkg-config static checks:"
-          pkg-config --modversion lcms2 || true
-          pkg-config --modversion liblqr-1 || true
-          pkg-config --modversion OpenEXR || true
-          echo "Looking for required static archives..."
-          for a in \
-            /usr/lib/x86_64-linux-gnu/liblcms2.a \
-            /usr/lib/x86_64-linux-gnu/liblqr-1.a
-          do
-            test -f "$a" || { echo "Missing static archive: $a"; exit 1; }
-            ls -l "$a"
-          done
+          archive="$(ls -1 build/imagemagick-*-linux-amd64.tar.gz | head -n 1)"
+          test -n "$archive"
+          ls -lh "$archive"
 
-          echo "OpenEXR static archive discovery:"
-          ls -l /usr/lib/x86_64-linux-gnu/libIlmImf*.a || true
-          ls -l /usr/lib/x86_64-linux-gnu/libOpenEXR*.a || true
-          ls -l /usr/lib/x86_64-linux-gnu/libIex*.a || true
-          ls -l /usr/lib/x86_64-linux-gnu/libImath*.a || true
+          temp_dir="$(mktemp -d)"
+          tar -xzf "$archive" -C "$temp_dir"
+          convert_bin="$(find "$temp_dir" -type f -path '*/bin/convert' | head -n 1)"
+          test -n "$convert_bin"
 
-      - name: Configure (prefer static)
-        run: |
-          set -euxo pipefail
-          export PKG_CONFIG="pkg-config --static"
-          export CFLAGS="-O2"
-          export CXXFLAGS="-O2"
-          export LDFLAGS="-static -Wl,-Bstatic"
-
-          # If your source tree is not repo root, cd there first.
-          ./configure \
-            --disable-shared \
-            --enable-static \
-            --with-lcms \
-            --with-lqr \
-            --without-openexr
-
-      - name: Build
-        run: |
-          set -euxo pipefail
-          make -j"$(nproc)"
-
-      - name: Linkage report
-        if: always()
-        run: |
-          set -euxo pipefail
-          if [ -f utilities/magick ]; then
-            file utilities/magick || true
-            ldd utilities/magick || true
-          fi
+          file "$convert_bin"
+          file "$convert_bin" | grep -q 'statically linked'
+          ldd "$convert_bin" || true
