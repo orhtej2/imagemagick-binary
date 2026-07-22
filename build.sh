@@ -17,6 +17,16 @@ TARGET_ARCH="${2:-$(uname -m)}"
 WORK_DIR="${PWD}/build-work"
 BUILD_DIR="${PWD}/build"
 PREFIX="${WORK_DIR}/install"
+PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig"
+
+export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}"
+export CPPFLAGS="-I$PREFIX/include"
+export LD_LIBRARY_PATH="$PREFIX/lib:$LD_LIBRARY_PATH"
+
+# Additional compiler flags for full static linking
+export CFLAGS="-O2"
+export CXXFLAGS="-O2"
+
 
 # Colors for output
 RED='\033[0;31m'
@@ -116,10 +126,8 @@ build_png() {
     cd libpng
     
     # Generate configure script if it doesn't exist
-    if [ ! -f "configure" ]; then
-        log_info "Generating libpng configure script..."
-        ./autogen.sh
-    fi
+    log_info "Generating libpng configure script..."
+    ./autogen.sh
     
     ./configure --prefix="$PREFIX" \
                 --disable-shared \
@@ -143,27 +151,25 @@ build_freetype() {
     cd freetype
     
     # Freetype 2.13+ uses meson, older versions use autotools
-    if [ -f "meson.build" ]; then
-        log_info "Building freetype with meson (v2.13+)..."
-        mkdir -p build
-        cd build
-        meson setup --prefix="$PREFIX" \
-                    --default-library=static \
-                    --buildtype=release \
-                    -Dbzip2=disabled \
-                    -Dharfbuzz=disabled \
-                    -Dmmap=enabled \
-                    ..
-        ninja
-        ninja install
-        cd ..
-    else
+    # if [ -f "meson.build" ]; then
+    #     log_info "Building freetype with meson (v2.13+)..."
+    #     mkdir -p build
+    #     cd build
+    #     meson setup --prefix="$PREFIX" \
+    #                 --default-library=static \
+    #                 --buildtype=release \
+    #                 -Dbzip2=disabled \
+    #                 -Dharfbuzz=disabled \
+    #                 -Dmmap=enabled \
+    #                 ..
+    #     ninja
+    #     ninja install
+    #     cd ..
+    # else
         # Fall back to autotools for older versions
         log_info "Building freetype with autotools (older versions)..."
-        if [ ! -f "configure" ]; then
-            log_info "Generating freetype configure script..."
-            ./autogen.sh
-        fi
+        log_info "Generating freetype configure script..."
+        ./autogen.sh
         
         ./configure --prefix="$PREFIX" \
                     --disable-shared \
@@ -171,7 +177,7 @@ build_freetype() {
                     --with-zlib-prefix="$PREFIX"
         make -j$(nproc)
         make install
-    fi
+    # fi
     
     cd ..
 }
@@ -294,14 +300,7 @@ build_imagemagick() {
     cd "$WORK_DIR/ImageMagick"
     
     # Export library paths - force static linking
-    export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig"
     export LDFLAGS="-static -static-libgcc -L$PREFIX/lib"
-    export CPPFLAGS="-I$PREFIX/include"
-    export LD_LIBRARY_PATH="$PREFIX/lib:$LD_LIBRARY_PATH"
-    
-    # Additional compiler flags for full static linking
-    export CFLAGS="-O2"
-    export CXXFLAGS="-O2"
     
     log_info "Running configure with full static linking (core utilities only)..."
     ./configure \
