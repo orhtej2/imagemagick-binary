@@ -472,10 +472,10 @@ verify_static() {
             # Use file command to check if static
             if file "$inspected_binary" | grep -q "statically linked"; then
                 log_info "✓ $(basename $binary) is fully static"
-                ((static_count++))
+                static_count=$((static_count + 1))
             else
                 log_warn "✗ $(basename $binary) may have dynamic dependencies"
-                ((dynamic_count++))
+                dynamic_count=$((dynamic_count + 1))
             fi
         fi
     done
