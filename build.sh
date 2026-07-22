@@ -134,15 +134,16 @@ build_freetype() {
     cd "$WORK_DIR"
     
     if [ ! -d "freetype" ]; then
+        # Try GNU savannah first, fall back to GitHub
         git clone --depth 1 https://git.savannah.gnu.org/git/freetype/freetype2.git freetype 2>/dev/null || \
         git clone --depth 1 https://github.com/freetype/freetype.git freetype
     fi
     
     cd freetype
     
-    # Freetype 2.13+ uses meson
+    # Freetype 2.13+ uses meson, older versions use autotools
     if [ -f "meson.build" ]; then
-        log_info "Building freetype with meson..."
+        log_info "Building freetype with meson (v2.13+)..."
         mkdir -p build
         cd build
         meson setup --prefix="$PREFIX" \
@@ -157,7 +158,7 @@ build_freetype() {
         cd ..
     else
         # Fall back to autotools for older versions
-        log_info "Building freetype with autotools..."
+        log_info "Building freetype with autotools (older versions)..."
         if [ ! -f "configure" ]; then
             log_info "Generating freetype configure script..."
             ./autogen.sh
@@ -166,7 +167,7 @@ build_freetype() {
         ./configure --prefix="$PREFIX" \
                     --disable-shared \
                     --enable-static \
-                    --with-zlib="$PREFIX"
+                    --with-zlib-prefix="$PREFIX"
         make -j$(nproc)
         make install
     fi
@@ -245,7 +246,8 @@ build_fontconfig() {
     ./configure --prefix="$PREFIX" \
                 --disable-shared \
                 --enable-static \
-                --with-freetype-config="$PREFIX/bin/freetype-config"
+                --with-freetype-config="$PREFIX/bin/freetype-config" \
+                --disable-docs
     make -j$(nproc)
     make install
     cd ..
@@ -297,8 +299,8 @@ build_imagemagick() {
     export LD_LIBRARY_PATH="$PREFIX/lib:$LD_LIBRARY_PATH"
     
     # Additional compiler flags for full static linking
-    export CFLAGS="-O2 -static"
-    export CXXFLAGS="-O2 -static"
+    export CFLAGS="-O2"
+    export CXXFLAGS="-O2"
     
     log_info "Running configure with full static linking..."
     ./configure \
@@ -320,11 +322,11 @@ build_imagemagick() {
         --disable-dependency-tracking \
         --enable-cipher
     
-    log_info "Compiling ImageMagick with static linking (using $(nproc) cores)..."
-    make -j$(nproc) LDFLAGS="-all-static -L$PREFIX/lib" || make LDFLAGS="-all-static -L$PREFIX/lib"
+    log_info "Compiling ImageMagick with full static linking (using $(nproc) cores)..."
+    make -j$(nproc) LDFLAGS="-all-static -L$PREFIX/lib -L$PREFIX/lib64"
     
     log_info "Installing..."
-    make install
+    make install DESTDIR=""
     
     cd "$WORK_DIR"
 }
@@ -334,22 +336,23 @@ verify_static() {
     log_info "Verifying binaries are fully static..."
     
     local bin_dir="$PREFIX/imagemagick/bin"
-    local has_dynamic=0
+    local static_count=0
+    local dynamic_count=0
     
     for binary in "$bin_dir"/*; do
         if [ -f "$binary" ] && [ -x "$binary" ]; then
-            if ldd "$binary" 2>/dev/null | grep -q "libc\|libm\|libdl"; then
-                log_warn "WARNING: $binary has dynamic dependencies"
-                has_dynamic=1
-            else
+            # Use file command to check if static
+            if file "$binary" | grep -q "statically linked"; then
                 log_info "✓ $(basename $binary) is fully static"
+                ((static_count++))
+            else
+                log_warn "✗ $(basename $binary) may have dynamic dependencies"
+                ((dynamic_count++))
             fi
         fi
     done
     
-    if [ $has_dynamic -eq 1 ]; then
-        log_warn "Some binaries have dynamic dependencies - attempting to rebuild with -all-static"
-    fi
+    log_info "Verification complete: $static_count static, $dynamic_count dynamic"
 }
 
 # Function to strip and compress binaries
@@ -357,6 +360,8 @@ optimize_binaries() {
     log_info "Stripping and optimizing binaries..."
     
     find "$PREFIX/imagemagick/bin" -type f -executable -exec strip --strip-all {} \; 2>/dev/null || true
+    
+    log_info "Binary optimization complete"
 }
 
 # Function to create portable tarball
@@ -462,8 +467,11 @@ Single binary includes all functionality. Typically 15-25MB per tool.
 
 To verify binaries are fully static:
 ```bash
+file ./bin/convert
+# Should show: "statically linked"
+
 ldd ./bin/convert
-# Should output: "not a dynamic executable"
+# Should show: "not a dynamic executable"
 ```
 
 EOF
@@ -478,7 +486,7 @@ EOF
     
     # Verify contents
     log_info "Tarball contents (binaries only):"
-    tar -tzf "${BUILD_DIR}/imagemagick-${tag}-linux-${arch}.tar.gz"
+    tar -tzf "${BUILD_DIR}/imagemagick-${tag}-linux-${arch}.tar.gz" | head -20
 }
 
 # Function to display usage
@@ -513,12 +521,24 @@ Output:
     - Build directory: build-work/
     - Installed at: build-work/install/imagemagick/bin/
 
+Build Process:
+    1. Installs build dependencies (autoconf, cmake, meson, ninja, etc.)
+    2. Builds zlib statically
+    3. Builds libjpeg-turbo statically (cmake)
+    4. Builds libpng statically (autotools)
+    5. Builds freetype statically (meson v2.13+ or autotools older)
+    6. Builds libwebp statically (autotools)
+    7. Builds libtiff statically (autotools)
+    8. Builds fontconfig statically (autotools)
+    9. Builds ImageMagick statically with all dependencies
+
 Features:
     ✓ Fully static binaries - everything embedded
     ✓ Zero external dependencies
     ✓ No .so files - just executables
     ✓ Portable across all Linux systems
     ✓ Single binary per tool (~15-25MB)
+    ✓ Automatic verification of static linking
 
 Notes:
     - Requires Ubuntu 22.04 or similar Debian-based system
@@ -623,12 +643,8 @@ main() {
     
     # Verify a binary
     if [ -f "$PREFIX/imagemagick/bin/convert" ]; then
-        log_info "Verifying binary..."
-        if ldd "$PREFIX/imagemagick/bin/convert" 2>/dev/null | grep -q "not a dynamic executable"; then
-            log_info "✓ Binaries are fully static and portable!"
-        else
-            log_warn "Binary may still have some dynamic dependencies"
-        fi
+        log_info "Final verification..."
+        file "$PREFIX/imagemagick/bin/convert"
     fi
     
     log_info ""
