@@ -58,7 +58,11 @@ install_dependencies() {
         libtool \
         cmake \
         nasm \
-        perl
+        perl \
+        python3 \
+        python3-pip \
+        meson \
+        ninja-build
     
     log_info "Build dependencies installed successfully"
 }
@@ -130,23 +134,43 @@ build_freetype() {
     cd "$WORK_DIR"
     
     if [ ! -d "freetype" ]; then
-        git clone --depth 1 https://git.savannah.gnu.org/git/freetype/freetype2.git freetype
+        git clone --depth 1 https://git.savannah.gnu.org/git/freetype/freetype2.git freetype 2>/dev/null || \
+        git clone --depth 1 https://github.com/freetype/freetype.git freetype
     fi
     
     cd freetype
     
-    # Generate configure script if it doesn't exist
-    if [ ! -f "configure" ]; then
-        log_info "Generating freetype configure script..."
-        ./autogen.sh
+    # Freetype 2.13+ uses meson
+    if [ -f "meson.build" ]; then
+        log_info "Building freetype with meson..."
+        mkdir -p build
+        cd build
+        meson setup --prefix="$PREFIX" \
+                    --default-library=static \
+                    --buildtype=release \
+                    -Dbzip2=disabled \
+                    -Dharfbuzz=disabled \
+                    -Dmmap=enabled \
+                    ..
+        ninja
+        ninja install
+        cd ..
+    else
+        # Fall back to autotools for older versions
+        log_info "Building freetype with autotools..."
+        if [ ! -f "configure" ]; then
+            log_info "Generating freetype configure script..."
+            ./autogen.sh
+        fi
+        
+        ./configure --prefix="$PREFIX" \
+                    --disable-shared \
+                    --enable-static \
+                    --with-zlib="$PREFIX"
+        make -j$(nproc)
+        make install
     fi
     
-    ./configure --prefix="$PREFIX" \
-                --disable-shared \
-                --enable-static \
-                --with-zlib="$PREFIX"
-    make -j$(nproc)
-    make install
     cd ..
 }
 
