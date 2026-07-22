@@ -135,24 +135,24 @@ install_dependencies() {
         exit 1
     fi
     
-    # sudo apt-get update
-    # sudo apt-get install -y \
-    #     build-essential \
-    #     pkg-config \
-    #     git \
-    #     curl \
-    #     wget \
-    #     autoconf \
-    #     automake \
-    #     libtool \
-    #     cmake \
-    #     nasm \
-    #     perl \
-    #     python3 \
-    #     python3-pip \
-    #     meson \
-    #     ninja-build \
-    #     gperf
+    sudo apt-get update
+    sudo apt-get install -y \
+        build-essential \
+        pkg-config \
+        git \
+        curl \
+        wget \
+        autoconf \
+        automake \
+        libtool \
+        cmake \
+        nasm \
+        perl \
+        python3 \
+        python3-pip \
+        meson \
+        ninja-build \
+        gperf
     
     log_info "Build dependencies installed successfully"
 }
