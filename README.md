@@ -1,0 +1,1 @@
+Prebuilt [ImageMagick](https://github.com/imagemagick/imagemagick) for Debian Bookworm.
