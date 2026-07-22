@@ -119,7 +119,7 @@ jobs:
   publish:
     needs: [check-and-build, build-amd64, build-arm64]
     if: needs.check-and-build.outputs.should_build == 'true'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-slim
     permissions:
       contents: write
     steps:
