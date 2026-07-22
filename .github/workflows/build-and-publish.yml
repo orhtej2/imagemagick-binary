@@ -71,58 +71,19 @@ jobs:
     if: needs.check-and-build.outputs.should_build == 'true'
     runs-on: ubuntu-22.04
     steps:
-      - name: Checkout ImageMagick
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          repository: ImageMagick/ImageMagick
-          ref: ${{ needs.check-and-build.outputs.release_tag }}
-
-      - name: Set up build environment
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            pkg-config \
-            libx11-dev \
-            libxext-dev \
-            libxcb1-dev \
-            zlib1g-dev \
-            libjpeg-dev \
-            libpng-dev \
-            libwebp-dev \
-            libtiff-dev \
-            libfreetype6-dev \
-            libfontconfig1-dev
-
-      - name: Configure ImageMagick for amd64
-        run: |
-          ./configure \
-            --prefix=/usr/local/imagemagick-amd64 \
-            --enable-shared \
-            --disable-static \
-            --with-quantum-depth=16 \
-            --enable-hdri \
-            --with-magick-plus-plus
 
       - name: Build ImageMagick for amd64
-        run: make -j$(nproc)
-
-      - name: Install ImageMagick for amd64
         run: |
-          mkdir -p /tmp/build/amd64
-          make install DESTDIR=/tmp/build/amd64
-
-      - name: Create amd64 tarball
-        run: |
-          cd /tmp/build/amd64
-          tar -czf /tmp/imagemagick-${{ needs.check-and-build.outputs.release_tag }}-linux-amd64.tar.gz .
-          ls -lh /tmp/imagemagick-*.tar.gz
+          chmod +x ./build.sh
+          ./build.sh ${{ needs.check-and-build.outputs.release_tag }} amd64
 
       - name: Upload amd64 artifact
         uses: actions/upload-artifact@v4
         with:
           name: imagemagick-amd64
-          path: /tmp/imagemagick-${{ needs.check-and-build.outputs.release_tag }}-linux-amd64.tar.gz
+          path: build/imagemagick-*-linux-amd64.tar.gz
           retention-days: 30
 
   build-arm64:
@@ -130,60 +91,19 @@ jobs:
     if: needs.check-and-build.outputs.should_build == 'true'
     runs-on: ubuntu-22.04
     steps:
-      - name: Set up QEMU for ARM64
-        uses: docker/setup-qemu-action@v3
-
-      - name: Checkout ImageMagick
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          repository: ImageMagick/ImageMagick
-          ref: ${{ needs.check-and-build.outputs.release_tag }}
 
-      - name: Build ImageMagick for arm64 using Docker
+      - name: Build ImageMagick for arm64
         run: |
-          docker run --rm \
-            -v $(pwd):/src \
-            -v /tmp/build:/tmp/build \
-            --platform linux/arm64 \
-            ubuntu:22.04 bash -c "
-              cd /src
-              apt-get update
-              apt-get install -y \
-                build-essential \
-                pkg-config \
-                libx11-dev \
-                libxext-dev \
-                libxcb1-dev \
-                zlib1g-dev \
-                libjpeg-dev \
-                libpng-dev \
-                libwebp-dev \
-                libtiff-dev \
-                libfreetype6-dev \
-                libfontconfig1-dev
-              ./configure \
-                --prefix=/usr/local/imagemagick-arm64 \
-                --enable-shared \
-                --disable-static \
-                --with-quantum-depth=16 \
-                --enable-hdri \
-                --with-magick-plus-plus
-              make -j\$(nproc)
-              mkdir -p /tmp/build/arm64
-              make install DESTDIR=/tmp/build/arm64
-            "
-
-      - name: Create arm64 tarball
-        run: |
-          cd /tmp/build/arm64
-          tar -czf /tmp/imagemagick-${{ needs.check-and-build.outputs.release_tag }}-linux-arm64.tar.gz .
-          ls -lh /tmp/imagemagick-*.tar.gz
+          chmod +x ./build.sh
+          ./build.sh ${{ needs.check-and-build.outputs.release_tag }} arm64
 
       - name: Upload arm64 artifact
         uses: actions/upload-artifact@v4
         with:
           name: imagemagick-arm64
-          path: /tmp/imagemagick-${{ needs.check-and-build.outputs.release_tag }}-linux-arm64.tar.gz
+          path: build/imagemagick-*-linux-arm64.tar.gz
           retention-days: 30
 
   publish:
@@ -224,7 +144,7 @@ jobs:
             echo "Creating new release $RELEASE_TAG..."
             gh release create "$RELEASE_TAG" \
               --title "ImageMagick $RELEASE_TAG" \
-              --notes "Built binaries for ImageMagick $RELEASE_TAG on Ubuntu 22.04" \
+              --notes "Built fully static self-contained binaries for ImageMagick $RELEASE_TAG on Ubuntu 22.04" \
               /tmp/artifacts/*
           fi
 
