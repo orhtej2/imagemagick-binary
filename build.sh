@@ -62,7 +62,8 @@ install_dependencies() {
         python3 \
         python3-pip \
         meson \
-        ninja-build
+        ninja-build \
+        gperf
     
     log_info "Build dependencies installed successfully"
 }

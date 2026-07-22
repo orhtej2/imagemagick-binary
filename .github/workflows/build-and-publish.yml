@@ -89,7 +89,7 @@ jobs:
   build-arm64:
     needs: check-and-build
     if: needs.check-and-build.outputs.should_build == 'true'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04-arm
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
