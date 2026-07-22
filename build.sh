@@ -421,6 +421,7 @@ build_imagemagick() {
         --disable-ltdl-install \
         --disable-magick-plus-plus \
         --disable-perl \
+        --without-x \
         --without-xml \
         --disable-openmp \
         --with-quantum-depth=16 \
@@ -508,7 +509,7 @@ create_portable_tarball() {
     
     # Copy core utilities (magick binary and scripts)
     local bin_dir="$PREFIX/imagemagick/bin"
-    local core_utils=("convert" "identify" "display" "animate" "composite" "mogrify" "compare" "magick")
+    local core_utils=("convert" "identify" "composite" "mogrify" "compare" "magick")
     
     mkdir -p "$temp_dir/imagemagick-${tag}-${arch}/bin"
     
@@ -563,11 +564,12 @@ sudo cp bin/* /usr/local/bin/
 - `magick` - Main ImageMagick utility
 - `convert` - Image conversion and manipulation
 - `identify` - Image information
-- `display` - Image display
-- `animate` - Animation tool
 - `composite` - Image composition
 - `mogrify` - In-place image modification
 - `compare` - Image comparison
+
+This portable build is configured without X11 delegate support.
+Commands that require X11 display integration (such as `display` and `animate`) are intentionally omitted.
 
 ## Usage Examples
 
