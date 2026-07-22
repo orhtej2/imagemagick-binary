@@ -172,22 +172,6 @@ jobs:
 
           ls -lh "$BOM_FILE"
 
-      - name: Create tag in this repository
-        run: |
-          set -euxo pipefail
-
-          RELEASE_TAG="${{ needs.check-and-build.outputs.release_tag }}"
-
-          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
-            echo "Tag $RELEASE_TAG already exists"
-            exit 0
-          fi
-
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git tag -a "$RELEASE_TAG" -m "ImageMagick $RELEASE_TAG"
-          git push origin "refs/tags/$RELEASE_TAG"
-
       - name: Create release and upload artifacts
         env:
           GH_TOKEN: ${{ github.token }}
@@ -207,7 +191,7 @@ jobs:
               --clobber
           else
             gh release create "$RELEASE_TAG" \
-              --verify-tag \
+              --target "${GITHUB_SHA}" \
               --title "ImageMagick $RELEASE_TAG" \
               --notes "Built fully static self-contained binaries for ImageMagick $RELEASE_TAG." \
               "$AMD64_ARCHIVE" \
