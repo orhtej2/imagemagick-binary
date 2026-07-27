@@ -63,6 +63,7 @@ update_var_if_newer "LCMS2_TAG" "LCMS2_REPO" '^lcms2\.[0-9]+$'
 update_var_if_newer "XZ_TAG" "XZ_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
 update_var_if_newer "LIBXML2_TAG" "LIBXML2_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
 update_var_if_newer "LIBZIP_TAG" "LIBZIP_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
+update_var_if_newer "LIBLQR_TAG" "LIBLQR_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
 update_var_if_newer "FRIBIDI_TAG" "FRIBIDI_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
 update_var_if_newer "LIBRAQM_TAG" "LIBRAQM_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
 update_var_if_newer "IMATH_TAG" "IMATH_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
@@ -109,6 +110,9 @@ LIBXML2_TAG="$LIBXML2_TAG"
 
 LIBZIP_REPO="$LIBZIP_REPO"
 LIBZIP_TAG="$LIBZIP_TAG"
+
+LIBLQR_REPO="$LIBLQR_REPO"
+LIBLQR_TAG="$LIBLQR_TAG"
 
 FRIBIDI_REPO="$FRIBIDI_REPO"
 FRIBIDI_TAG="$FRIBIDI_TAG"

@@ -102,6 +102,7 @@ load_dependency_lock() {
         XZ_REPO XZ_TAG
         LIBXML2_REPO LIBXML2_TAG
         LIBZIP_REPO LIBZIP_TAG
+        LIBLQR_REPO LIBLQR_TAG
         FRIBIDI_REPO FRIBIDI_TAG
         LIBRAQM_REPO LIBRAQM_TAG
         IMATH_REPO IMATH_TAG
@@ -380,6 +381,26 @@ build_libzip() {
         -DBUILD_EXAMPLES=OFF
     cmake --build build -j$(nproc)
     cmake --install build
+    cd ..
+}
+
+build_liblqr() {
+    log_info "Building liblqr (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "liblqr" "$LIBLQR_REPO" "$LIBLQR_TAG"
+
+    cd liblqr
+    if [ ! -f "configure" ]; then
+        log_info "Generating liblqr configure script..."
+        ./autogen.sh
+    fi
+
+    ./configure --prefix="$PREFIX" \
+                --disable-shared \
+                --enable-static
+    make -j$(nproc)
+    make install
     cd ..
 }
 
@@ -729,8 +750,9 @@ build_imagemagick() {
         make distclean >/dev/null 2>&1 || true
     fi
     
-    # Export library paths - force static linking.
+    # Keep build fully static and isolated from host pkg-config metadata.
     export LDFLAGS="-static -static-libgcc -L$PREFIX/lib -L$PREFIX/lib64"
+    export PKG_CONFIG_LIBDIR="$PKG_CONFIG_PATH"
 
     local required_pkgs=(zlib libpng libtiff-4 liblzma libxml-2.0 libzip raqm OpenEXR)
     local libraw_pkg=""
@@ -744,7 +766,7 @@ build_imagemagick() {
             exit 1
         fi
 
-        required_pkgs+=(libde265 libheif "$libraw_pkg")
+        required_pkgs+=(libde265 libheif "$libraw_pkg" lqr-1)
     fi
 
     if ! pkg-config --exists "${required_pkgs[@]}"; then
@@ -793,9 +815,6 @@ build_imagemagick() {
         configure_args+=(
             --with-heic=yes
             --with-raw=yes
-            --with-jxl=yes
-            --with-rsvg=yes
-            --with-pango=yes
             --with-lqr=yes
         )
     fi
@@ -905,6 +924,7 @@ This build includes everything needed:
 - xz/liblzma
 - libxml2
 - libzip
+- liblqr
 - fribidi
 - libraqm
 - Imath
@@ -1057,21 +1077,22 @@ Build Process:
     8. Builds lcms2 statically (autotools)
     9. Builds xz/liblzma statically (autotools)
     10. Builds libzip statically (cmake)
-    11. Builds freetype statically (pass 1, without harfbuzz)
-    12. Builds harfbuzz statically
-    13. Rebuilds freetype statically (pass 2, with harfbuzz)
-    14. Builds fribidi statically (meson)
-    15. Builds libraqm statically (autotools)
-    16. Builds Imath statically (cmake)
-    17. Builds OpenEXR statically (cmake)
-    18. Builds libde265 statically (cmake)
-    19. Builds libheif statically (cmake)
-    20. Builds LibRaw statically (cmake)
-    21. Builds libwebp statically (autotools)
-    22. Builds libtiff statically (autotools)
-    23. Builds libxml2 statically (autotools)
-    24. Builds fontconfig statically (autotools)
-    25. Builds ImageMagick core utilities statically with all dependencies
+    11. Builds liblqr statically (autotools)
+    12. Builds freetype statically (pass 1, without harfbuzz)
+    13. Builds harfbuzz statically
+    14. Rebuilds freetype statically (pass 2, with harfbuzz)
+    15. Builds fribidi statically (meson)
+    16. Builds libraqm statically (meson)
+    17. Builds Imath statically (cmake)
+    18. Builds OpenEXR statically (cmake)
+    19. Builds libde265 statically (cmake)
+    20. Builds libheif statically (cmake)
+    21. Builds LibRaw statically (autotools)
+    22. Builds libwebp statically (autotools)
+    23. Builds libtiff statically (autotools)
+    24. Builds libxml2 statically (cmake)
+    25. Builds fontconfig statically (autotools)
+    26. Builds ImageMagick core utilities statically with all dependencies
 
 Features:
     ✓ Fully static binaries - everything embedded
@@ -1090,7 +1111,7 @@ Notes:
     - First build will take significant time (~45-90 minutes)
     - Subsequent builds are faster due to cached dependencies
     - Binaries are smaller (~8-15MB per tool vs 15-25MB with bindings)
-    - Set FULL_DELEGATES=true to attempt additional delegates (HEIC/RAW/JXL/RSVG/PANGO/LQR)
+    - Set FULL_DELEGATES=true to enable extra source-built delegates (HEIC/RAW/LQR)
     
 To clean up build artifacts:
     rm -rf build-work/
@@ -1184,6 +1205,7 @@ main() {
     build_lcms2
     build_xz
     build_libzip
+    build_liblqr
     build_freetype false
     build_harfbuzz
     build_freetype true

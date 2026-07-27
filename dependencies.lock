@@ -31,6 +31,9 @@ LIBXML2_TAG="v2.14.6"
 LIBZIP_REPO="https://github.com/nih-at/libzip.git"
 LIBZIP_TAG="v1.11.4"
 
+LIBLQR_REPO="https://github.com/carlobaldassi/liblqr.git"
+LIBLQR_TAG="v0.4.3"
+
 FRIBIDI_REPO="https://github.com/fribidi/fribidi.git"
 FRIBIDI_TAG="v1.0.16"
 
