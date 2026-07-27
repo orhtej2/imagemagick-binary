@@ -880,7 +880,19 @@ build_imagemagick() {
         exit 1
     fi
 
-    local required_pkgs=(zlib libpng "$tiff_pkg" liblzma libxml-2.0 libzip raqm OpenEXR)
+    # Keep higher-level libraries before their static dependencies so GNU ld can
+    # resolve symbols in a single left-to-right pass.
+    local required_pkgs=(
+        libzip
+        raqm
+        OpenEXR
+        "$tiff_pkg"
+        libpng
+        libxml-2.0
+        zlib
+        liblzma
+        libzstd
+    )
     local libraw_pkg=""
     if [[ "$FULL_DELEGATES" == "true" ]]; then
         if pkg-config --exists libraw_r; then
@@ -892,7 +904,7 @@ build_imagemagick() {
             exit 1
         fi
 
-        required_pkgs+=(libde265 libheif "$libraw_pkg" lqr-1)
+        required_pkgs+=(libheif "$libraw_pkg" lqr-1 libde265)
     fi
 
     local missing_pkgs=()
