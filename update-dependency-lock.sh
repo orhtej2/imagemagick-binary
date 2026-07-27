@@ -62,6 +62,11 @@ update_var_if_newer "OPENJPEG_TAG" "OPENJPEG_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
 update_var_if_newer "LCMS2_TAG" "LCMS2_REPO" '^lcms2\.[0-9]+$'
 update_var_if_newer "XZ_TAG" "XZ_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
 update_var_if_newer "LIBXML2_TAG" "LIBXML2_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
+update_var_if_newer "LIBZIP_TAG" "LIBZIP_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
+update_var_if_newer "FRIBIDI_TAG" "FRIBIDI_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
+update_var_if_newer "LIBRAQM_TAG" "LIBRAQM_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
+update_var_if_newer "IMATH_TAG" "IMATH_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
+update_var_if_newer "OPENEXR_TAG" "OPENEXR_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
 update_var_if_newer "FREETYPE_TAG" "FREETYPE_REPO" '^VER-[0-9]+(-[0-9]+){2,3}$'
 update_var_if_newer "HARFBUZZ_TAG" "HARFBUZZ_REPO" '^v?[0-9]+(\.[0-9]+){1,3}$'
 update_var_if_newer "LIBWEBP_TAG" "LIBWEBP_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
@@ -98,6 +103,21 @@ XZ_TAG="$XZ_TAG"
 
 LIBXML2_REPO="$LIBXML2_REPO"
 LIBXML2_TAG="$LIBXML2_TAG"
+
+LIBZIP_REPO="$LIBZIP_REPO"
+LIBZIP_TAG="$LIBZIP_TAG"
+
+FRIBIDI_REPO="$FRIBIDI_REPO"
+FRIBIDI_TAG="$FRIBIDI_TAG"
+
+LIBRAQM_REPO="$LIBRAQM_REPO"
+LIBRAQM_TAG="$LIBRAQM_TAG"
+
+IMATH_REPO="$IMATH_REPO"
+IMATH_TAG="$IMATH_TAG"
+
+OPENEXR_REPO="$OPENEXR_REPO"
+OPENEXR_TAG="$OPENEXR_TAG"
 
 FREETYPE_REPO="$FREETYPE_REPO"
 FREETYPE_TAG="$FREETYPE_TAG"

@@ -100,6 +100,11 @@ load_dependency_lock() {
         LCMS2_REPO LCMS2_TAG
         XZ_REPO XZ_TAG
         LIBXML2_REPO LIBXML2_TAG
+        LIBZIP_REPO LIBZIP_TAG
+        FRIBIDI_REPO FRIBIDI_TAG
+        LIBRAQM_REPO LIBRAQM_TAG
+        IMATH_REPO IMATH_TAG
+        OPENEXR_REPO OPENEXR_TAG
         FREETYPE_REPO FREETYPE_TAG
         HARFBUZZ_REPO HARFBUZZ_TAG
         LIBWEBP_REPO LIBWEBP_TAG
@@ -345,6 +350,110 @@ build_libxml2() {
     cd ..
 }
 
+build_libzip() {
+    log_info "Building libzip (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "libzip" "$LIBZIP_REPO" "$LIBZIP_TAG"
+
+    cd libzip
+    rm -rf build
+    cmake -S . -B build \
+        -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DENABLE_GNUTLS=OFF \
+        -DENABLE_MBEDTLS=OFF \
+        -DENABLE_OPENSSL=OFF \
+        -DENABLE_COMMONCRYPTO=OFF \
+        -DBUILD_TOOLS=OFF \
+        -DBUILD_REGRESS=OFF \
+        -DBUILD_EXAMPLES=OFF
+    cmake --build build -j$(nproc)
+    cmake --install build
+    cd ..
+}
+
+build_fribidi() {
+    log_info "Building fribidi (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "fribidi" "$FRIBIDI_REPO" "$FRIBIDI_TAG"
+
+    cd fribidi
+    rm -rf build
+    meson setup build \
+        --prefix="$PREFIX" \
+        --libdir=lib \
+        --default-library=static \
+        --buildtype=release \
+        -Ddocs=false \
+        -Dtests=false \
+        -Dbin=false
+    ninja -C build
+    ninja -C build install
+    cd ..
+}
+
+build_libraqm() {
+    log_info "Building libraqm (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "libraqm" "$LIBRAQM_REPO" "$LIBRAQM_TAG"
+
+    cd libraqm
+    if [ ! -f "configure" ]; then
+        log_info "Generating libraqm configure script..."
+        ./autogen.sh
+    fi
+
+    ./configure --prefix="$PREFIX" \
+                --disable-shared \
+                --enable-static
+    make -j$(nproc)
+    make install
+    cd ..
+}
+
+build_imath() {
+    log_info "Building Imath (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "Imath" "$IMATH_REPO" "$IMATH_TAG"
+
+    cd Imath
+    rm -rf build
+    cmake -S . -B build \
+        -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DBUILD_TESTING=OFF
+    cmake --build build -j$(nproc)
+    cmake --install build
+    cd ..
+}
+
+build_openexr() {
+    log_info "Building OpenEXR (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "openexr" "$OPENEXR_REPO" "$OPENEXR_TAG"
+
+    cd openexr
+    rm -rf build
+    cmake -S . -B build \
+        -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DBUILD_TESTING=OFF \
+        -DOPENEXR_BUILD_TOOLS=OFF \
+        -DOPENEXR_BUILD_EXAMPLES=OFF \
+        -DCMAKE_PREFIX_PATH="$PREFIX"
+    cmake --build build -j$(nproc)
+    cmake --install build
+    cd ..
+}
+
 build_freetype() {
     local enable_harfbuzz="${1:-false}"
 
@@ -534,12 +643,12 @@ build_imagemagick() {
     # Export library paths - force static linking.
     export LDFLAGS="-static -static-libgcc -L$PREFIX/lib -L$PREFIX/lib64"
 
-    if ! pkg-config --exists zlib libpng libtiff-4 liblzma libxml-2.0; then
-        log_error "Required static pkg-config metadata for zlib/libpng/libtiff/liblzma/libxml2 not found in $PREFIX"
+    if ! pkg-config --exists zlib libpng libtiff-4 liblzma libxml-2.0 libzip raqm OpenEXR; then
+        log_error "Required static pkg-config metadata for zlib/libpng/libtiff/liblzma/libxml2/libzip/raqm/OpenEXR not found in $PREFIX"
         exit 1
     fi
 
-    export LIBS="$(pkg-config --libs --static zlib libpng libtiff-4 libxml-2.0) ${LIBS:-}"
+    export LIBS="$(pkg-config --libs --static zlib libpng libtiff-4 libxml-2.0 libzip raqm OpenEXR) ${LIBS:-}"
 
     # Avoid stale tools from previous runs (for example Magick++-config).
     rm -rf "$PREFIX/imagemagick"
@@ -552,7 +661,6 @@ build_imagemagick() {
         --without-magick-plus-plus \
         --with-perl=no \
         --without-x \
-        --without-xml \
         --disable-openmp \
         --with-quantum-depth=16 \
         --enable-hdri \
@@ -564,6 +672,9 @@ build_imagemagick() {
         --with-openjp2=yes \
         --with-lcms=yes \
         --with-lzma=yes \
+        --with-openexr=yes \
+        --with-raqm=yes \
+        --with-zip=yes \
         --with-freetype=yes \
         --with-webp=yes \
         --with-tiff=yes \
@@ -675,6 +786,11 @@ This build includes everything needed:
 - lcms2
 - xz/liblzma
 - libxml2
+- libzip
+- fribidi
+- libraqm
+- Imath
+- OpenEXR
 - freetype
 - harfbuzz
 - libwebp
@@ -819,14 +935,19 @@ Build Process:
     7. Builds openjpeg statically (cmake)
     8. Builds lcms2 statically (autotools)
     9. Builds xz/liblzma statically (autotools)
-    10. Builds freetype statically (pass 1, without harfbuzz)
-    11. Builds harfbuzz statically
-    12. Rebuilds freetype statically (pass 2, with harfbuzz)
-    13. Builds libwebp statically (autotools)
-    14. Builds libtiff statically (autotools)
-    15. Builds libxml2 statically (autotools)
-    16. Builds fontconfig statically (autotools)
-    17. Builds ImageMagick core utilities statically with all dependencies
+    10. Builds libzip statically (cmake)
+    11. Builds freetype statically (pass 1, without harfbuzz)
+    12. Builds harfbuzz statically
+    13. Rebuilds freetype statically (pass 2, with harfbuzz)
+    14. Builds fribidi statically (meson)
+    15. Builds libraqm statically (autotools)
+    16. Builds Imath statically (cmake)
+    17. Builds OpenEXR statically (cmake)
+    18. Builds libwebp statically (autotools)
+    19. Builds libtiff statically (autotools)
+    20. Builds libxml2 statically (autotools)
+    21. Builds fontconfig statically (autotools)
+    22. Builds ImageMagick core utilities statically with all dependencies
 
 Features:
     ✓ Fully static binaries - everything embedded
@@ -936,9 +1057,14 @@ main() {
     build_openjpeg
     build_lcms2
     build_xz
+    build_libzip
     build_freetype false
     build_harfbuzz
     build_freetype true
+    build_fribidi
+    build_libraqm
+    build_imath
+    build_openexr
     build_webp
     build_tiff
     build_libxml2
