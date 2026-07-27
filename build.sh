@@ -752,7 +752,7 @@ build_imagemagick() {
     
     # Keep build fully static and isolated from host pkg-config metadata.
     export LDFLAGS="-static -static-libgcc -L$PREFIX/lib -L$PREFIX/lib64"
-    export PKG_CONFIG_LIBDIR="$PKG_CONFIG_PATH"
+    # export PKG_CONFIG_LIBDIR="$PKG_CONFIG_PATH"
 
     local required_pkgs=(zlib libpng libtiff-4 liblzma libxml-2.0 libzip raqm OpenEXR)
     local libraw_pkg=""
