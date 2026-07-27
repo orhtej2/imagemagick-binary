@@ -178,7 +178,7 @@ install_dependencies() {
     sudo apt-get update
     sudo apt-get install -y \
         build-essential \
-        pkg-config \
+        pkgconf \
         git \
         curl \
         wget \
