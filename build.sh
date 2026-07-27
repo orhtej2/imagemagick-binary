@@ -407,8 +407,15 @@ build_imagemagick() {
         make distclean >/dev/null 2>&1 || true
     fi
     
-    # Export library paths - force static linking
-    export LDFLAGS="-static -static-libgcc -L$PREFIX/lib"
+    # Export library paths - force static linking.
+    export LDFLAGS="-static -static-libgcc -L$PREFIX/lib -L$PREFIX/lib64"
+
+    if ! pkg-config --exists zlib libpng; then
+        log_error "Required static pkg-config metadata for zlib/libpng not found in $PREFIX"
+        exit 1
+    fi
+
+    export LIBS="$(pkg-config --libs --static zlib libpng) ${LIBS:-}"
 
     # Avoid stale tools from previous runs (for example Magick++-config).
     rm -rf "$PREFIX/imagemagick"
@@ -418,21 +425,20 @@ build_imagemagick() {
         --prefix="$PREFIX/imagemagick" \
         --enable-static \
         --disable-shared \
-        --disable-ltdl-install \
-        --disable-magick-plus-plus \
-        --disable-perl \
+        --without-magick-plus-plus \
+        --with-perl=no \
         --without-x \
         --without-xml \
         --disable-openmp \
         --with-quantum-depth=16 \
         --enable-hdri \
-        --with-zlib="$PREFIX" \
-        --with-jpeg="$PREFIX" \
-        --with-png="$PREFIX" \
-        --with-freetype="$PREFIX" \
-        --with-webp="$PREFIX" \
-        --with-tiff="$PREFIX" \
-        --with-fontconfig="$PREFIX" \
+        --with-zlib=yes \
+        --with-jpeg=yes \
+        --with-png=yes \
+        --with-freetype=yes \
+        --with-webp=yes \
+        --with-tiff=yes \
+        --with-fontconfig=yes \
         --disable-docs \
         --disable-dependency-tracking \
         --enable-cipher
