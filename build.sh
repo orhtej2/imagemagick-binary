@@ -94,6 +94,12 @@ load_dependency_lock() {
         ZLIB_REPO ZLIB_TAG
         LIBJPEG_TURBO_REPO LIBJPEG_TURBO_TAG
         LIBPNG_REPO LIBPNG_TAG
+        BZIP2_REPO BZIP2_TAG
+        ZSTD_REPO ZSTD_TAG
+        OPENJPEG_REPO OPENJPEG_TAG
+        LCMS2_REPO LCMS2_TAG
+        XZ_REPO XZ_TAG
+        LIBXML2_REPO LIBXML2_TAG
         FREETYPE_REPO FREETYPE_TAG
         HARFBUZZ_REPO HARFBUZZ_TAG
         LIBWEBP_REPO LIBWEBP_TAG
@@ -216,6 +222,124 @@ build_png() {
                 --disable-shared \
                 --enable-static \
                 --with-zlib-prefix="$PREFIX"
+    make -j$(nproc)
+    make install
+    cd ..
+}
+
+build_bzip2() {
+    log_info "Building bzip2 (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "bzip2" "$BZIP2_REPO" "$BZIP2_TAG"
+
+    cd bzip2
+    make clean >/dev/null 2>&1 || true
+    make -j$(nproc) CFLAGS="$CFLAGS -fPIC"
+    make install PREFIX="$PREFIX"
+    cd ..
+}
+
+build_zstd() {
+    log_info "Building zstd (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "zstd" "$ZSTD_REPO" "$ZSTD_TAG"
+
+    cd zstd
+    rm -rf build/cmake/build-static
+    cmake -S build/cmake -B build/cmake/build-static \
+        -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DZSTD_BUILD_PROGRAMS=OFF \
+        -DZSTD_BUILD_SHARED=OFF \
+        -DZSTD_BUILD_STATIC=ON
+    cmake --build build/cmake/build-static -j$(nproc)
+    cmake --install build/cmake/build-static
+    cd ..
+}
+
+build_openjpeg() {
+    log_info "Building openjpeg (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "openjpeg" "$OPENJPEG_REPO" "$OPENJPEG_TAG"
+
+    cd openjpeg
+    rm -rf build
+    cmake -S . -B build \
+        -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DBUILD_CODEC=OFF \
+        -DBUILD_JPIP=OFF
+    cmake --build build -j$(nproc)
+    cmake --install build
+    cd ..
+}
+
+build_lcms2() {
+    log_info "Building lcms2 (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "lcms2" "$LCMS2_REPO" "$LCMS2_TAG"
+
+    cd lcms2
+    if [ ! -f "configure" ]; then
+        log_info "Generating lcms2 configure script..."
+        autoreconf -fi
+    fi
+
+    ./configure --prefix="$PREFIX" \
+                --disable-shared \
+                --enable-static
+    make -j$(nproc)
+    make install
+    cd ..
+}
+
+build_xz() {
+    log_info "Building xz/liblzma (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "xz" "$XZ_REPO" "$XZ_TAG"
+
+    cd xz
+
+    ./configure --prefix="$PREFIX" \
+                --disable-shared \
+                --enable-static \
+                --disable-xz \
+                --disable-xzdec \
+                --disable-lzmadec \
+                --disable-lzmainfo \
+                --disable-scripts \
+                --disable-doc
+    make -j$(nproc)
+    make install
+    cd ..
+}
+
+build_libxml2() {
+    log_info "Building libxml2 (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "libxml2" "$LIBXML2_REPO" "$LIBXML2_TAG"
+
+    cd libxml2
+
+    if [ ! -f "configure" ]; then
+        log_info "Generating libxml2 configure script..."
+        ./autogen.sh
+    fi
+
+    ./configure --prefix="$PREFIX" \
+                --disable-shared \
+                --enable-static \
+                --without-python \
+                --without-icu \
+                --with-zlib="$PREFIX" \
+                --with-lzma="$PREFIX"
     make -j$(nproc)
     make install
     cd ..
@@ -410,12 +534,12 @@ build_imagemagick() {
     # Export library paths - force static linking.
     export LDFLAGS="-static -static-libgcc -L$PREFIX/lib -L$PREFIX/lib64"
 
-    if ! pkg-config --exists zlib libpng; then
-        log_error "Required static pkg-config metadata for zlib/libpng not found in $PREFIX"
+    if ! pkg-config --exists zlib libpng libtiff-4 liblzma libxml-2.0; then
+        log_error "Required static pkg-config metadata for zlib/libpng/libtiff/liblzma/libxml2 not found in $PREFIX"
         exit 1
     fi
 
-    export LIBS="$(pkg-config --libs --static zlib libpng) ${LIBS:-}"
+    export LIBS="$(pkg-config --libs --static zlib libpng libtiff-4 libxml-2.0) ${LIBS:-}"
 
     # Avoid stale tools from previous runs (for example Magick++-config).
     rm -rf "$PREFIX/imagemagick"
@@ -433,12 +557,18 @@ build_imagemagick() {
         --with-quantum-depth=16 \
         --enable-hdri \
         --with-zlib=yes \
+        --with-bzlib=yes \
+        --with-zstd=yes \
         --with-jpeg=yes \
         --with-png=yes \
+        --with-openjp2=yes \
+        --with-lcms=yes \
+        --with-lzma=yes \
         --with-freetype=yes \
         --with-webp=yes \
         --with-tiff=yes \
         --with-fontconfig=yes \
+        --with-xml=yes \
         --disable-docs \
         --disable-dependency-tracking \
         --enable-cipher
@@ -539,6 +669,12 @@ This build includes everything needed:
 - zlib
 - libjpeg-turbo
 - libpng
+- bzip2
+- zstd
+- openjpeg
+- lcms2
+- xz/liblzma
+- libxml2
 - freetype
 - harfbuzz
 - libwebp
@@ -678,13 +814,19 @@ Build Process:
     2. Builds zlib statically
     3. Builds libjpeg-turbo statically (cmake)
     4. Builds libpng statically (autotools)
-    5. Builds freetype statically (pass 1, without harfbuzz)
-    6. Builds harfbuzz statically
-    7. Rebuilds freetype statically (pass 2, with harfbuzz)
-    8. Builds libwebp statically (autotools)
-    9. Builds libtiff statically (autotools)
-    10. Builds fontconfig statically (autotools)
-    11. Builds ImageMagick core utilities statically with all dependencies
+    5. Builds bzip2 statically
+    6. Builds zstd statically (cmake)
+    7. Builds openjpeg statically (cmake)
+    8. Builds lcms2 statically (autotools)
+    9. Builds xz/liblzma statically (autotools)
+    10. Builds freetype statically (pass 1, without harfbuzz)
+    11. Builds harfbuzz statically
+    12. Rebuilds freetype statically (pass 2, with harfbuzz)
+    13. Builds libwebp statically (autotools)
+    14. Builds libtiff statically (autotools)
+    15. Builds libxml2 statically (autotools)
+    16. Builds fontconfig statically (autotools)
+    17. Builds ImageMagick core utilities statically with all dependencies
 
 Features:
     ✓ Fully static binaries - everything embedded
@@ -789,11 +931,17 @@ main() {
     build_zlib
     build_jpeg
     build_png
+    build_bzip2
+    build_zstd
+    build_openjpeg
+    build_lcms2
+    build_xz
     build_freetype false
     build_harfbuzz
     build_freetype true
     build_webp
     build_tiff
+    build_libxml2
     build_fontconfig
     
     # Fetch and build ImageMagick

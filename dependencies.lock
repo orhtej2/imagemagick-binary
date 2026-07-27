@@ -10,6 +10,24 @@ LIBJPEG_TURBO_TAG="3.2.0"
 LIBPNG_REPO="https://github.com/glennrp/libpng.git"
 LIBPNG_TAG="v1.6.58"
 
+BZIP2_REPO="https://github.com/libarchive/bzip2.git"
+BZIP2_TAG="bzip2-1.0.8"
+
+ZSTD_REPO="https://github.com/facebook/zstd.git"
+ZSTD_TAG="v1.5.7"
+
+OPENJPEG_REPO="https://github.com/uclouvain/openjpeg.git"
+OPENJPEG_TAG="v2.5.4"
+
+LCMS2_REPO="https://github.com/mm2/Little-CMS.git"
+LCMS2_TAG="lcms2.17"
+
+XZ_REPO="https://github.com/tukaani-project/xz.git"
+XZ_TAG="v5.8.1"
+
+LIBXML2_REPO="https://gitlab.gnome.org/GNOME/libxml2.git"
+LIBXML2_TAG="v2.14.6"
+
 FREETYPE_REPO="https://github.com/freetype/freetype.git"
 FREETYPE_TAG="VER-2-14-3"
 

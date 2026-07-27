@@ -56,6 +56,12 @@ update_var_if_newer() {
 update_var_if_newer "ZLIB_TAG" "ZLIB_REPO" '^v?[0-9]+(\.[0-9]+){1,3}$'
 update_var_if_newer "LIBJPEG_TURBO_TAG" "LIBJPEG_TURBO_REPO" '^[0-9]+(\.[0-9]+){1,3}$'
 update_var_if_newer "LIBPNG_TAG" "LIBPNG_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
+update_var_if_newer "BZIP2_TAG" "BZIP2_REPO" '^bzip2-[0-9]+(\.[0-9]+){1,3}$'
+update_var_if_newer "ZSTD_TAG" "ZSTD_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
+update_var_if_newer "OPENJPEG_TAG" "OPENJPEG_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
+update_var_if_newer "LCMS2_TAG" "LCMS2_REPO" '^lcms2\.[0-9]+$'
+update_var_if_newer "XZ_TAG" "XZ_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
+update_var_if_newer "LIBXML2_TAG" "LIBXML2_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
 update_var_if_newer "FREETYPE_TAG" "FREETYPE_REPO" '^VER-[0-9]+(-[0-9]+){2,3}$'
 update_var_if_newer "HARFBUZZ_TAG" "HARFBUZZ_REPO" '^v?[0-9]+(\.[0-9]+){1,3}$'
 update_var_if_newer "LIBWEBP_TAG" "LIBWEBP_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
@@ -74,6 +80,24 @@ LIBJPEG_TURBO_TAG="$LIBJPEG_TURBO_TAG"
 
 LIBPNG_REPO="$LIBPNG_REPO"
 LIBPNG_TAG="$LIBPNG_TAG"
+
+BZIP2_REPO="$BZIP2_REPO"
+BZIP2_TAG="$BZIP2_TAG"
+
+ZSTD_REPO="$ZSTD_REPO"
+ZSTD_TAG="$ZSTD_TAG"
+
+OPENJPEG_REPO="$OPENJPEG_REPO"
+OPENJPEG_TAG="$OPENJPEG_TAG"
+
+LCMS2_REPO="$LCMS2_REPO"
+LCMS2_TAG="$LCMS2_TAG"
+
+XZ_REPO="$XZ_REPO"
+XZ_TAG="$XZ_TAG"
+
+LIBXML2_REPO="$LIBXML2_REPO"
+LIBXML2_TAG="$LIBXML2_TAG"
 
 FREETYPE_REPO="$FREETYPE_REPO"
 FREETYPE_TAG="$FREETYPE_TAG"

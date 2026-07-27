@@ -146,9 +146,36 @@ jobs:
 
           RELEASE_TAG="${{ needs.check-and-build.outputs.release_tag }}"
           BOM_FILE="/tmp/artifacts/imagemagick-${RELEASE_TAG}-dependencies.bom.txt"
+          RELEASE_NOTES_FILE="/tmp/artifacts/imagemagick-${RELEASE_TAG}-release-notes.md"
 
           # shellcheck source=/dev/null
           source ./dependencies.lock
+
+          repo_http_url() {
+            local repo_url="$1"
+            repo_url="${repo_url%.git}"
+            if [[ "$repo_url" == git@github.com:* ]]; then
+              repo_url="https://github.com/${repo_url#git@github.com:}"
+            elif [[ "$repo_url" == git@gitlab.com:* ]]; then
+              repo_url="https://gitlab.com/${repo_url#git@gitlab.com:}"
+            fi
+            printf '%s\n' "$repo_url"
+          }
+
+          repo_release_link() {
+            local repo_url="$1"
+            local tag="$2"
+            local base
+            base="$(repo_http_url "$repo_url")"
+
+            if [[ "$base" == https://github.com/* ]]; then
+              printf '%s\n' "$base/releases/tag/$tag"
+            elif [[ "$base" == https://gitlab.com/* ]]; then
+              printf '%s\n' "$base/-/tags/$tag"
+            else
+              printf '%s\n' "$base"
+            fi
+          }
 
           {
             echo "ImageMagick Release BOM"
@@ -160,6 +187,12 @@ jobs:
             printf '%-18s %-60s %s\n' "zlib" "$ZLIB_REPO" "$ZLIB_TAG"
             printf '%-18s %-60s %s\n' "libjpeg-turbo" "$LIBJPEG_TURBO_REPO" "$LIBJPEG_TURBO_TAG"
             printf '%-18s %-60s %s\n' "libpng" "$LIBPNG_REPO" "$LIBPNG_TAG"
+            printf '%-18s %-60s %s\n' "bzip2" "$BZIP2_REPO" "$BZIP2_TAG"
+            printf '%-18s %-60s %s\n' "zstd" "$ZSTD_REPO" "$ZSTD_TAG"
+            printf '%-18s %-60s %s\n' "openjpeg" "$OPENJPEG_REPO" "$OPENJPEG_TAG"
+            printf '%-18s %-60s %s\n' "lcms2" "$LCMS2_REPO" "$LCMS2_TAG"
+            printf '%-18s %-60s %s\n' "xz" "$XZ_REPO" "$XZ_TAG"
+            printf '%-18s %-60s %s\n' "libxml2" "$LIBXML2_REPO" "$LIBXML2_TAG"
             printf '%-18s %-60s %s\n' "freetype" "$FREETYPE_REPO" "$FREETYPE_TAG"
             printf '%-18s %-60s %s\n' "harfbuzz" "$HARFBUZZ_REPO" "$HARFBUZZ_TAG"
             printf '%-18s %-60s %s\n' "libwebp" "$LIBWEBP_REPO" "$LIBWEBP_TAG"
@@ -170,7 +203,37 @@ jobs:
             cat ./dependencies.lock
           } > "$BOM_FILE"
 
+          IMAGEMAGICK_RELEASE_URL="https://github.com/ImageMagick/ImageMagick/releases/tag/${RELEASE_TAG}"
+
+          {
+            echo "# ImageMagick ${RELEASE_TAG}"
+            echo
+            echo "Upstream ImageMagick release: [${RELEASE_TAG}](${IMAGEMAGICK_RELEASE_URL})"
+            echo
+            echo "## Build BOM"
+            echo
+            echo "| Library | Repository | Tag | Upstream Tag/Release |"
+            echo "| --- | --- | --- | --- |"
+            printf '| %s | %s | %s | [link](%s) |\n' "zlib" "[repo]($(repo_http_url "$ZLIB_REPO"))" "$ZLIB_TAG" "$(repo_release_link "$ZLIB_REPO" "$ZLIB_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "libjpeg-turbo" "[repo]($(repo_http_url "$LIBJPEG_TURBO_REPO"))" "$LIBJPEG_TURBO_TAG" "$(repo_release_link "$LIBJPEG_TURBO_REPO" "$LIBJPEG_TURBO_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "libpng" "[repo]($(repo_http_url "$LIBPNG_REPO"))" "$LIBPNG_TAG" "$(repo_release_link "$LIBPNG_REPO" "$LIBPNG_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "bzip2" "[repo]($(repo_http_url "$BZIP2_REPO"))" "$BZIP2_TAG" "$(repo_release_link "$BZIP2_REPO" "$BZIP2_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "zstd" "[repo]($(repo_http_url "$ZSTD_REPO"))" "$ZSTD_TAG" "$(repo_release_link "$ZSTD_REPO" "$ZSTD_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "openjpeg" "[repo]($(repo_http_url "$OPENJPEG_REPO"))" "$OPENJPEG_TAG" "$(repo_release_link "$OPENJPEG_REPO" "$OPENJPEG_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "lcms2" "[repo]($(repo_http_url "$LCMS2_REPO"))" "$LCMS2_TAG" "$(repo_release_link "$LCMS2_REPO" "$LCMS2_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "xz" "[repo]($(repo_http_url "$XZ_REPO"))" "$XZ_TAG" "$(repo_release_link "$XZ_REPO" "$XZ_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "libxml2" "[repo]($(repo_http_url "$LIBXML2_REPO"))" "$LIBXML2_TAG" "$(repo_release_link "$LIBXML2_REPO" "$LIBXML2_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "freetype" "[repo]($(repo_http_url "$FREETYPE_REPO"))" "$FREETYPE_TAG" "$(repo_release_link "$FREETYPE_REPO" "$FREETYPE_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "harfbuzz" "[repo]($(repo_http_url "$HARFBUZZ_REPO"))" "$HARFBUZZ_TAG" "$(repo_release_link "$HARFBUZZ_REPO" "$HARFBUZZ_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "libwebp" "[repo]($(repo_http_url "$LIBWEBP_REPO"))" "$LIBWEBP_TAG" "$(repo_release_link "$LIBWEBP_REPO" "$LIBWEBP_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "libtiff" "[repo]($(repo_http_url "$LIBTIFF_REPO"))" "$LIBTIFF_TAG" "$(repo_release_link "$LIBTIFF_REPO" "$LIBTIFF_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "fontconfig" "[repo]($(repo_http_url "$FONTCONFIG_REPO"))" "$FONTCONFIG_TAG" "$(repo_release_link "$FONTCONFIG_REPO" "$FONTCONFIG_TAG")"
+            echo
+            echo "Build artifacts in this release are statically linked and produced by this repository's workflow."
+          } > "$RELEASE_NOTES_FILE"
+
           ls -lh "$BOM_FILE"
+          ls -lh "$RELEASE_NOTES_FILE"
 
       - name: Create release and upload artifacts
         env:
@@ -182,8 +245,10 @@ jobs:
           AMD64_ARCHIVE="/tmp/artifacts/amd64/imagemagick-${RELEASE_TAG}-linux-amd64.tar.gz"
           ARM64_ARCHIVE="/tmp/artifacts/arm64/imagemagick-${RELEASE_TAG}-linux-arm64.tar.gz"
           BOM_FILE="/tmp/artifacts/imagemagick-${RELEASE_TAG}-dependencies.bom.txt"
+          RELEASE_NOTES_FILE="/tmp/artifacts/imagemagick-${RELEASE_TAG}-release-notes.md"
 
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --notes-file "$RELEASE_NOTES_FILE"
             gh release upload "$RELEASE_TAG" \
               "$AMD64_ARCHIVE" \
               "$ARM64_ARCHIVE" \
@@ -193,7 +258,7 @@ jobs:
             gh release create "$RELEASE_TAG" \
               --target "${GITHUB_SHA}" \
               --title "ImageMagick $RELEASE_TAG" \
-              --notes "Built fully static self-contained binaries for ImageMagick $RELEASE_TAG." \
+              --notes-file "$RELEASE_NOTES_FILE" \
               "$AMD64_ARCHIVE" \
               "$ARM64_ARCHIVE" \
               "$BOM_FILE"
