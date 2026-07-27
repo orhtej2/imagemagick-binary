@@ -93,6 +93,7 @@ load_dependency_lock() {
 
     local required_vars=(
         ZLIB_REPO ZLIB_TAG
+        LIBDEFLATE_REPO LIBDEFLATE_TAG
         LIBJPEG_TURBO_REPO LIBJPEG_TURBO_TAG
         LIBPNG_REPO LIBPNG_TAG
         BZIP2_REPO BZIP2_TAG
@@ -214,6 +215,27 @@ build_zlib() {
     CFLAGS="$zlib_cflags" ./configure --static --prefix="$PREFIX"
     make -j$(nproc)
     make install
+    cd ..
+}
+
+build_libdeflate() {
+    log_info "Building libdeflate (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "libdeflate" "$LIBDEFLATE_REPO" "$LIBDEFLATE_TAG"
+
+    cd libdeflate
+    rm -rf build
+    cmake -S . -B build \
+        -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DLIBDEFLATE_BUILD_STATIC_LIB=ON \
+        -DLIBDEFLATE_BUILD_SHARED_LIB=OFF \
+        -DLIBDEFLATE_BUILD_GZIP=OFF \
+        -DLIBDEFLATE_BUILD_TESTS=OFF \
+        -DLIBDEFLATE_INSTALL=ON
+    cmake --build build -j$(nproc)
+    cmake --install build
     cd ..
 }
 
@@ -787,6 +809,8 @@ build_tiff() {
                 --enable-static \
                 --with-zlib-include-dir="$PREFIX/include" \
                 --with-zlib-lib-dir="$PREFIX/lib" \
+                --with-libdeflate-include-dir="$PREFIX/include" \
+                --with-libdeflate-lib-dir="$PREFIX/lib" \
                 --with-jpeg-include-dir="$PREFIX/include" \
                 --with-jpeg-lib-dir="$PREFIX/lib"
     make -j$(nproc)
@@ -889,6 +913,7 @@ build_imagemagick() {
         "$tiff_pkg"
         libpng
         libxml-2.0
+        libdeflate
         zlib
         liblzma
         libzstd
@@ -928,7 +953,7 @@ build_imagemagick() {
     local pkg_static_libs
     pkg_static_libs="$(pkg-config --libs --static "${required_pkgs[@]}")"
     log_info "Resolved static pkg-config libs: $pkg_static_libs"
-    export LIBS="-Wl,--start-group ${pkg_static_libs} -Wl,--end-group -lheif -lde265 -lzip -lzstd -llzma -ldl -lpthread -lm ${LIBS:-}"
+    export LIBS="-Wl,--start-group ${pkg_static_libs} -Wl,--end-group -lheif -lde265 -lzip -lzstd -llzma -ldeflate -ldl -lpthread -lm ${LIBS:-}"
 
     # Avoid stale tools from previous runs (for example Magick++-config).
     rm -rf "$PREFIX/imagemagick"
@@ -1069,6 +1094,7 @@ This is a completely self-contained build of ImageMagick core utilities with ALL
 
 This build includes everything needed:
 - zlib
+- libdeflate
 - libjpeg-turbo
 - libpng
 - bzip2
@@ -1227,33 +1253,34 @@ Output:
 Build Process:
     1. Installs build dependencies (autoconf, cmake, meson, ninja, etc.)
     2. Builds zlib statically
-    3. Builds libjpeg-turbo statically (cmake)
-    4. Builds libpng statically (autotools)
-    5. Builds bzip2 statically
-    6. Builds zstd statically (cmake)
-    7. Builds openjpeg statically (cmake)
-    8. Builds lcms2 statically (autotools)
-    9. Builds xz/liblzma statically (autotools)
-    10. Builds libzip statically (cmake)
-    11. Builds PCRE2 statically (cmake)
-    12. Builds libffi statically (autotools)
-    13. Builds glib-2.0 statically (meson, with vendored gvdb)
-    14. Builds liblqr statically (autotools)
-    15. Builds freetype statically (pass 1, without harfbuzz)
-    16. Builds harfbuzz statically
-    17. Rebuilds freetype statically (pass 2, with harfbuzz)
-    18. Builds fribidi statically (meson)
-    19. Builds libraqm statically (meson)
-    20. Builds Imath statically (cmake)
-    21. Builds OpenEXR statically (cmake)
-    22. Builds libde265 statically (cmake)
-    23. Builds libheif statically (cmake)
-    24. Builds LibRaw statically (autotools)
-    25. Builds libwebp statically (autotools)
-    26. Builds libtiff statically (autotools)
-    27. Builds libxml2 statically (cmake)
-    28. Builds fontconfig statically (autotools)
-    29. Builds ImageMagick core utilities statically with all dependencies
+    3. Builds libdeflate statically (cmake)
+    4. Builds libjpeg-turbo statically (cmake)
+    5. Builds libpng statically (autotools)
+    6. Builds bzip2 statically
+    7. Builds zstd statically (cmake)
+    8. Builds openjpeg statically (cmake)
+    9. Builds lcms2 statically (autotools)
+    10. Builds xz/liblzma statically (autotools)
+    11. Builds libzip statically (cmake)
+    12. Builds PCRE2 statically (cmake)
+    13. Builds libffi statically (autotools)
+    14. Builds glib-2.0 statically (meson, with vendored gvdb)
+    15. Builds liblqr statically (autotools)
+    16. Builds freetype statically (pass 1, without harfbuzz)
+    17. Builds harfbuzz statically
+    18. Rebuilds freetype statically (pass 2, with harfbuzz)
+    19. Builds fribidi statically (meson)
+    20. Builds libraqm statically (meson)
+    21. Builds Imath statically (cmake)
+    22. Builds OpenEXR statically (cmake)
+    23. Builds libde265 statically (cmake)
+    24. Builds libheif statically (cmake)
+    25. Builds LibRaw statically (autotools)
+    26. Builds libwebp statically (autotools)
+    27. Builds libtiff statically (autotools)
+    28. Builds libxml2 statically (cmake)
+    29. Builds fontconfig statically (autotools)
+    30. Builds ImageMagick core utilities statically with all dependencies
 
 Features:
     ✓ Fully static binaries - everything embedded
@@ -1358,6 +1385,7 @@ main() {
     # Build all static dependencies
     log_info "Building static dependencies..."
     build_zlib
+    build_libdeflate
     build_jpeg
     build_png
     build_bzip2

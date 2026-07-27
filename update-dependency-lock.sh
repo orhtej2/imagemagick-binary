@@ -54,6 +54,7 @@ update_var_if_newer() {
 }
 
 update_var_if_newer "ZLIB_TAG" "ZLIB_REPO" '^v?[0-9]+(\.[0-9]+){1,3}$'
+update_var_if_newer "LIBDEFLATE_TAG" "LIBDEFLATE_REPO" '^v?[0-9]+(\.[0-9]+){1,3}$'
 update_var_if_newer "LIBJPEG_TURBO_TAG" "LIBJPEG_TURBO_REPO" '^[0-9]+(\.[0-9]+){1,3}$'
 update_var_if_newer "LIBPNG_TAG" "LIBPNG_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
 update_var_if_newer "BZIP2_TAG" "BZIP2_REPO" '^bzip2-[0-9]+(\.[0-9]+){1,3}$'
@@ -86,6 +87,9 @@ cat > "$LOCK_FILE" <<EOF
 
 ZLIB_REPO="$ZLIB_REPO"
 ZLIB_TAG="$ZLIB_TAG"
+
+LIBDEFLATE_REPO="$LIBDEFLATE_REPO"
+LIBDEFLATE_TAG="$LIBDEFLATE_TAG"
 
 LIBJPEG_TURBO_REPO="$LIBJPEG_TURBO_REPO"
 LIBJPEG_TURBO_TAG="$LIBJPEG_TURBO_TAG"
