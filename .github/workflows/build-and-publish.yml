@@ -177,9 +177,17 @@ jobs:
             local base
             base="$(repo_http_url "$repo_url")"
 
-            if [[ "$base" == https://github.com/* ]]; then
+            if [[ "$tag" =~ ^[0-9a-f]{40}$ ]]; then
+              if [[ "$base" == https://github.com/* ]]; then
+                printf '%s\n' "$base/commit/$tag"
+              elif [[ "$base" == https://gitlab.com/* || "$base" == https://gitlab.gnome.org/* || "$base" == https://gitlab.freedesktop.org/* ]]; then
+                printf '%s\n' "$base/-/commit/$tag"
+              else
+                printf '%s\n' "$base"
+              fi
+            elif [[ "$base" == https://github.com/* ]]; then
               printf '%s\n' "$base/releases/tag/$tag"
-            elif [[ "$base" == https://gitlab.com/* ]]; then
+            elif [[ "$base" == https://gitlab.com/* || "$base" == https://gitlab.gnome.org/* || "$base" == https://gitlab.freedesktop.org/* ]]; then
               printf '%s\n' "$base/-/tags/$tag"
             else
               printf '%s\n' "$base"
@@ -203,6 +211,10 @@ jobs:
             printf '%-18s %-60s %s\n' "xz" "$XZ_REPO" "$XZ_TAG"
             printf '%-18s %-60s %s\n' "libxml2" "$LIBXML2_REPO" "$LIBXML2_TAG"
             printf '%-18s %-60s %s\n' "libzip" "$LIBZIP_REPO" "$LIBZIP_TAG"
+            printf '%-18s %-60s %s\n' "pcre2" "$PCRE2_REPO" "$PCRE2_TAG"
+            printf '%-18s %-60s %s\n' "libffi" "$LIBFFI_REPO" "$LIBFFI_TAG"
+            printf '%-18s %-60s %s\n' "glib" "$GLIB_REPO" "$GLIB_TAG"
+            printf '%-18s %-60s %s\n' "gvdb" "$GVDB_REPO" "$GVDB_REF"
             printf '%-18s %-60s %s\n' "liblqr" "$LIBLQR_REPO" "$LIBLQR_TAG"
             printf '%-18s %-60s %s\n' "fribidi" "$FRIBIDI_REPO" "$FRIBIDI_TAG"
             printf '%-18s %-60s %s\n' "libraqm" "$LIBRAQM_REPO" "$LIBRAQM_TAG"
@@ -242,6 +254,10 @@ jobs:
             printf '| %s | %s | %s | [link](%s) |\n' "xz" "[repo]($(repo_http_url "$XZ_REPO"))" "$XZ_TAG" "$(repo_release_link "$XZ_REPO" "$XZ_TAG")"
             printf '| %s | %s | %s | [link](%s) |\n' "libxml2" "[repo]($(repo_http_url "$LIBXML2_REPO"))" "$LIBXML2_TAG" "$(repo_release_link "$LIBXML2_REPO" "$LIBXML2_TAG")"
             printf '| %s | %s | %s | [link](%s) |\n' "libzip" "[repo]($(repo_http_url "$LIBZIP_REPO"))" "$LIBZIP_TAG" "$(repo_release_link "$LIBZIP_REPO" "$LIBZIP_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "pcre2" "[repo]($(repo_http_url "$PCRE2_REPO"))" "$PCRE2_TAG" "$(repo_release_link "$PCRE2_REPO" "$PCRE2_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "libffi" "[repo]($(repo_http_url "$LIBFFI_REPO"))" "$LIBFFI_TAG" "$(repo_release_link "$LIBFFI_REPO" "$LIBFFI_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "glib" "[repo]($(repo_http_url "$GLIB_REPO"))" "$GLIB_TAG" "$(repo_release_link "$GLIB_REPO" "$GLIB_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "gvdb" "[repo]($(repo_http_url "$GVDB_REPO"))" "$GVDB_REF" "$(repo_release_link "$GVDB_REPO" "$GVDB_REF")"
             printf '| %s | %s | %s | [link](%s) |\n' "liblqr" "[repo]($(repo_http_url "$LIBLQR_REPO"))" "$LIBLQR_TAG" "$(repo_release_link "$LIBLQR_REPO" "$LIBLQR_TAG")"
             printf '| %s | %s | %s | [link](%s) |\n' "fribidi" "[repo]($(repo_http_url "$FRIBIDI_REPO"))" "$FRIBIDI_TAG" "$(repo_release_link "$FRIBIDI_REPO" "$FRIBIDI_TAG")"
             printf '| %s | %s | %s | [link](%s) |\n' "libraqm" "[repo]($(repo_http_url "$LIBRAQM_REPO"))" "$LIBRAQM_TAG" "$(repo_release_link "$LIBRAQM_REPO" "$LIBRAQM_TAG")"

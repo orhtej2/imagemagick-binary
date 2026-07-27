@@ -31,6 +31,18 @@ LIBXML2_TAG="v2.14.6"
 LIBZIP_REPO="https://github.com/nih-at/libzip.git"
 LIBZIP_TAG="v1.11.4"
 
+PCRE2_REPO="https://github.com/PCRE2Project/pcre2.git"
+PCRE2_TAG="pcre2-10.47"
+
+LIBFFI_REPO="https://github.com/libffi/libffi.git"
+LIBFFI_TAG="v3.5.2"
+
+GLIB_REPO="https://github.com/GNOME/glib.git"
+GLIB_TAG="2.74.7"
+
+GVDB_REPO="https://gitlab.gnome.org/GNOME/gvdb.git"
+GVDB_REF="0854af0fdb6d527a8d1999835ac2c5059976c210"
+
 LIBLQR_REPO="https://github.com/carlobaldassi/liblqr.git"
 LIBLQR_TAG="v0.4.3"
 

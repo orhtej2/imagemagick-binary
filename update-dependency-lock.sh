@@ -63,6 +63,9 @@ update_var_if_newer "LCMS2_TAG" "LCMS2_REPO" '^lcms2\.[0-9]+$'
 update_var_if_newer "XZ_TAG" "XZ_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
 update_var_if_newer "LIBXML2_TAG" "LIBXML2_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
 update_var_if_newer "LIBZIP_TAG" "LIBZIP_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
+update_var_if_newer "PCRE2_TAG" "PCRE2_REPO" '^pcre2-[0-9]+(\.[0-9]+){2}$'
+update_var_if_newer "LIBFFI_TAG" "LIBFFI_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
+update_var_if_newer "GLIB_TAG" "GLIB_REPO" '^[0-9]+\.[0-9]*[02468]\.[0-9]+$'
 update_var_if_newer "LIBLQR_TAG" "LIBLQR_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
 update_var_if_newer "FRIBIDI_TAG" "FRIBIDI_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
 update_var_if_newer "LIBRAQM_TAG" "LIBRAQM_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
@@ -110,6 +113,18 @@ LIBXML2_TAG="$LIBXML2_TAG"
 
 LIBZIP_REPO="$LIBZIP_REPO"
 LIBZIP_TAG="$LIBZIP_TAG"
+
+PCRE2_REPO="$PCRE2_REPO"
+PCRE2_TAG="$PCRE2_TAG"
+
+LIBFFI_REPO="$LIBFFI_REPO"
+LIBFFI_TAG="$LIBFFI_TAG"
+
+GLIB_REPO="$GLIB_REPO"
+GLIB_TAG="$GLIB_TAG"
+
+GVDB_REPO="$GVDB_REPO"
+GVDB_REF="$GVDB_REF"
 
 LIBLQR_REPO="$LIBLQR_REPO"
 LIBLQR_TAG="$LIBLQR_TAG"

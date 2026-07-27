@@ -20,7 +20,7 @@ BUILD_DIR="${PWD}/build"
 PREFIX="${WORK_DIR}/install"
 LOCK_FILE="${PWD}/dependencies.lock"
 HOST_MULTIARCH="$(gcc -dumpmachine 2>/dev/null || true)"
-PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/lib/pkgconfig/x86_64:$PREFIX/share/pkgconfig"
+PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig:$PREFIX/share/pkgconfig"
 
 if [ -n "$HOST_MULTIARCH" ]; then
     PKG_CONFIG_PATH="$PKG_CONFIG_PATH:$PREFIX/lib/$HOST_MULTIARCH/pkgconfig"
@@ -102,6 +102,10 @@ load_dependency_lock() {
         XZ_REPO XZ_TAG
         LIBXML2_REPO LIBXML2_TAG
         LIBZIP_REPO LIBZIP_TAG
+        PCRE2_REPO PCRE2_TAG
+        LIBFFI_REPO LIBFFI_TAG
+        GLIB_REPO GLIB_TAG
+        GVDB_REPO GVDB_REF
         LIBLQR_REPO LIBLQR_TAG
         FRIBIDI_REPO FRIBIDI_TAG
         LIBRAQM_REPO LIBRAQM_TAG
@@ -146,6 +150,20 @@ checkout_repo_tag() {
     fi
 
     git -C "$repo_dir" checkout -f "$repo_tag"
+}
+
+checkout_repo_ref() {
+    local repo_dir="$1"
+    local repo_url="$2"
+    local repo_ref="$3"
+
+    rm -rf "$repo_dir"
+    mkdir -p "$repo_dir"
+
+    git -C "$repo_dir" init >/dev/null
+    git -C "$repo_dir" remote add origin "$repo_url"
+    git -C "$repo_dir" fetch --depth 1 origin "$repo_ref"
+    git -C "$repo_dir" checkout -f FETCH_HEAD
 }
 
 # Function to install build dependencies
@@ -381,6 +399,96 @@ build_libzip() {
         -DBUILD_EXAMPLES=OFF
     cmake --build build -j$(nproc)
     cmake --install build
+    cd ..
+}
+
+build_pcre2() {
+    log_info "Building PCRE2 (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "pcre2" "$PCRE2_REPO" "$PCRE2_TAG"
+
+    cd pcre2
+    rm -rf build
+    cmake -S . -B build \
+        -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DBUILD_STATIC_LIBS=ON \
+        -DPCRE2_BUILD_PCRE2_8=ON \
+        -DPCRE2_BUILD_PCRE2_16=OFF \
+        -DPCRE2_BUILD_PCRE2_32=OFF \
+        -DPCRE2_BUILD_TESTS=OFF \
+        -DPCRE2_BUILD_PCRE2GREP=OFF \
+        -DPCRE2_SUPPORT_JIT=OFF \
+        -DPCRE2_SHOW_REPORT=OFF \
+        -DPCRE2_SUPPORT_LIBBZ2=OFF \
+        -DPCRE2_SUPPORT_LIBZ=OFF \
+        -DPCRE2_SUPPORT_LIBREADLINE=OFF \
+        -DPCRE2_SUPPORT_LIBEDIT=OFF
+    cmake --build build -j$(nproc)
+    cmake --install build
+    cd ..
+}
+
+build_libffi() {
+    log_info "Building libffi (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "libffi" "$LIBFFI_REPO" "$LIBFFI_TAG"
+
+    cd libffi
+    if [ ! -f "configure" ]; then
+        log_info "Generating libffi configure script..."
+        ./autogen.sh
+    fi
+
+    ./configure --prefix="$PREFIX" \
+                --disable-shared \
+                --enable-static \
+                --disable-docs \
+                --disable-multi-os-directory
+    make -j$(nproc)
+    make install
+    cd ..
+}
+
+build_glib() {
+    log_info "Building glib-2.0 (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "glib" "$GLIB_REPO" "$GLIB_TAG"
+
+    cd glib
+    rm -rf build subprojects/gvdb
+    mkdir -p subprojects
+    checkout_repo_ref "subprojects/gvdb" "$GVDB_REPO" "$GVDB_REF"
+
+    meson setup build \
+        --prefix="$PREFIX" \
+        --libdir=lib \
+        --default-library=static \
+        --buildtype=release \
+        --wrap-mode=nofallback \
+        -Dtests=false \
+        -Dinstalled_tests=false \
+        -Dgtk_doc=false \
+        -Dman=false \
+        -Dnls=disabled \
+        -Dselinux=disabled \
+        -Dlibmount=disabled \
+        -Dxattr=false \
+        -Ddtrace=false \
+        -Dsystemtap=false \
+        -Dsysprof=disabled \
+        -Dlibelf=disabled \
+        -Dmultiarch=false \
+        -Dglib_debug=disabled \
+        -Dglib_assert=false \
+        -Dglib_checks=false \
+        -Doss_fuzz=disabled
+    ninja -C build
+    ninja -C build install
     cd ..
 }
 
@@ -932,6 +1040,10 @@ This build includes everything needed:
 - xz/liblzma
 - libxml2
 - libzip
+- PCRE2
+- libffi
+- glib-2.0
+- gvdb
 - liblqr
 - fribidi
 - libraqm
@@ -1085,22 +1197,25 @@ Build Process:
     8. Builds lcms2 statically (autotools)
     9. Builds xz/liblzma statically (autotools)
     10. Builds libzip statically (cmake)
-    11. Builds liblqr statically (autotools)
-    12. Builds freetype statically (pass 1, without harfbuzz)
-    13. Builds harfbuzz statically
-    14. Rebuilds freetype statically (pass 2, with harfbuzz)
-    15. Builds fribidi statically (meson)
-    16. Builds libraqm statically (meson)
-    17. Builds Imath statically (cmake)
-    18. Builds OpenEXR statically (cmake)
-    19. Builds libde265 statically (cmake)
-    20. Builds libheif statically (cmake)
-    21. Builds LibRaw statically (autotools)
-    22. Builds libwebp statically (autotools)
-    23. Builds libtiff statically (autotools)
-    24. Builds libxml2 statically (cmake)
-    25. Builds fontconfig statically (autotools)
-    26. Builds ImageMagick core utilities statically with all dependencies
+    11. Builds PCRE2 statically (cmake)
+    12. Builds libffi statically (autotools)
+    13. Builds glib-2.0 statically (meson, with vendored gvdb)
+    14. Builds liblqr statically (autotools)
+    15. Builds freetype statically (pass 1, without harfbuzz)
+    16. Builds harfbuzz statically
+    17. Rebuilds freetype statically (pass 2, with harfbuzz)
+    18. Builds fribidi statically (meson)
+    19. Builds libraqm statically (meson)
+    20. Builds Imath statically (cmake)
+    21. Builds OpenEXR statically (cmake)
+    22. Builds libde265 statically (cmake)
+    23. Builds libheif statically (cmake)
+    24. Builds LibRaw statically (autotools)
+    25. Builds libwebp statically (autotools)
+    26. Builds libtiff statically (autotools)
+    27. Builds libxml2 statically (cmake)
+    28. Builds fontconfig statically (autotools)
+    29. Builds ImageMagick core utilities statically with all dependencies
 
 Features:
     ✓ Fully static binaries - everything embedded
@@ -1213,6 +1328,9 @@ main() {
     build_lcms2
     build_xz
     build_libzip
+    build_pcre2
+    build_libffi
+    build_glib
     build_liblqr
     build_freetype false
     build_harfbuzz
