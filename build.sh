@@ -20,7 +20,7 @@ BUILD_DIR="${PWD}/build"
 PREFIX="${WORK_DIR}/install"
 LOCK_FILE="${PWD}/dependencies.lock"
 HOST_MULTIARCH="$(gcc -dumpmachine 2>/dev/null || true)"
-PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig"
+PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/lib/pkgconfig/x86_64:$PREFIX/share/pkgconfig"
 
 if [ -n "$HOST_MULTIARCH" ]; then
     PKG_CONFIG_PATH="$PKG_CONFIG_PATH:$PREFIX/lib/$HOST_MULTIARCH/pkgconfig"
@@ -769,8 +769,16 @@ build_imagemagick() {
         required_pkgs+=(libde265 libheif "$libraw_pkg" lqr-1)
     fi
 
-    if ! pkg-config --exists "${required_pkgs[@]}"; then
-        log_error "Required static pkg-config metadata missing: ${required_pkgs[*]}"
+    local missing_pkgs=()
+    local pkg_name
+    for pkg_name in "${required_pkgs[@]}"; do
+        if ! pkg-config --exists "$pkg_name"; then
+            missing_pkgs+=("$pkg_name")
+        fi
+    done
+
+    if [ "${#missing_pkgs[@]}" -ne 0 ]; then
+        log_error "Required static pkg-config metadata missing: ${missing_pkgs[*]}"
         exit 1
     fi
 
