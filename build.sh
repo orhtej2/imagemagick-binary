@@ -925,7 +925,10 @@ build_imagemagick() {
         exit 1
     fi
 
-    export LIBS="$(pkg-config --libs --static "${required_pkgs[@]}") ${LIBS:-}"
+    local pkg_static_libs
+    pkg_static_libs="$(pkg-config --libs --static "${required_pkgs[@]}")"
+    log_info "Resolved static pkg-config libs: $pkg_static_libs"
+    export LIBS="-Wl,--start-group ${pkg_static_libs} -Wl,--end-group -lheif -lde265 -lzip -lzstd -llzma -ldl -lpthread -lm ${LIBS:-}"
 
     # Avoid stale tools from previous runs (for example Magick++-config).
     rm -rf "$PREFIX/imagemagick"
