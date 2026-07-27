@@ -186,6 +186,7 @@ install_dependencies() {
         autoconf \
         automake \
         libtool \
+        libltdl-dev \
         cmake \
         nasm \
         perl \
@@ -440,7 +441,10 @@ build_libffi() {
     cd libffi
     if [ ! -f "configure" ]; then
         log_info "Generating libffi configure script..."
-        ./autogen.sh
+        if [ -f "/usr/share/aclocal/ltdl.m4" ] && [ ! -f "m4/ltdl.m4" ]; then
+            cp /usr/share/aclocal/ltdl.m4 m4/ltdl.m4
+        fi
+        autoreconf -vfi -I m4
     fi
 
     ./configure --prefix="$PREFIX" \
