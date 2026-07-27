@@ -866,7 +866,21 @@ build_imagemagick() {
     export LDFLAGS="-static -static-libgcc -L$PREFIX/lib -L$PREFIX/lib64"
     # export PKG_CONFIG_LIBDIR="$PKG_CONFIG_PATH"
 
-    local required_pkgs=(zlib libpng libtiff-4 liblzma libxml-2.0 libzip raqm OpenEXR)
+    local tiff_pkg=""
+    if pkg-config --exists libtiff-4; then
+        tiff_pkg="libtiff-4"
+    elif pkg-config --exists libtiff; then
+        tiff_pkg="libtiff"
+    else
+        log_error "Required static pkg-config metadata missing: libtiff-4/libtiff"
+        log_info "pkg-config search path: $PKG_CONFIG_LIBDIR"
+        pkg-config --print-errors --exists libtiff-4 || true
+        pkg-config --print-errors --exists libtiff || true
+        find "$PREFIX" -type f -name 'libtiff*.pc' -print || true
+        exit 1
+    fi
+
+    local required_pkgs=(zlib libpng "$tiff_pkg" liblzma libxml-2.0 libzip raqm OpenEXR)
     local libraw_pkg=""
     if [[ "$FULL_DELEGATES" == "true" ]]; then
         if pkg-config --exists libraw_r; then
@@ -891,6 +905,11 @@ build_imagemagick() {
 
     if [ "${#missing_pkgs[@]}" -ne 0 ]; then
         log_error "Required static pkg-config metadata missing: ${missing_pkgs[*]}"
+        log_info "pkg-config search path: $PKG_CONFIG_LIBDIR"
+        local missing_pkg
+        for missing_pkg in "${missing_pkgs[@]}"; do
+            pkg-config --print-errors --exists "$missing_pkg" || true
+        done
         exit 1
     fi
 
