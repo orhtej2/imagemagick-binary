@@ -14,6 +14,7 @@ set -e
 IMAGEMAGICK_REPO="https://github.com/ImageMagick/ImageMagick.git"
 RELEASE_TAG="${1:-latest}"
 TARGET_ARCH="${2:-$(uname -m)}"
+FULL_DELEGATES="${FULL_DELEGATES:-${3:-false}}"
 WORK_DIR="${PWD}/build-work"
 BUILD_DIR="${PWD}/build"
 PREFIX="${WORK_DIR}/install"
@@ -105,6 +106,9 @@ load_dependency_lock() {
         LIBRAQM_REPO LIBRAQM_TAG
         IMATH_REPO IMATH_TAG
         OPENEXR_REPO OPENEXR_TAG
+        LIBDE265_REPO LIBDE265_TAG
+        LIBHEIF_REPO LIBHEIF_TAG
+        LIBRAW_REPO LIBRAW_TAG
         FREETYPE_REPO FREETYPE_TAG
         HARFBUZZ_REPO HARFBUZZ_TAG
         LIBWEBP_REPO LIBWEBP_TAG
@@ -171,7 +175,8 @@ install_dependencies() {
         meson \
         ninja-build \
         gperf \
-        autopoint
+        autopoint \
+        po4a
     
     log_info "Build dependencies installed successfully"
 }
@@ -297,7 +302,8 @@ build_lcms2() {
 
     ./configure --prefix="$PREFIX" \
                 --disable-shared \
-                --enable-static
+                --enable-static \
+                --disable-examples
     make -j$(nproc)
     make install
     cd ..
@@ -310,6 +316,11 @@ build_xz() {
     checkout_repo_tag "xz" "$XZ_REPO" "$XZ_TAG"
 
     cd xz
+
+    if [ ! -f "configure" ]; then
+        log_info "Generating xz configure script..."
+        ./autogen.sh
+    fi
 
     ./configure --prefix="$PREFIX" \
                 --disable-shared \
@@ -332,21 +343,19 @@ build_libxml2() {
     checkout_repo_tag "libxml2" "$LIBXML2_REPO" "$LIBXML2_TAG"
 
     cd libxml2
-
-    if [ ! -f "configure" ]; then
-        log_info "Generating libxml2 configure script..."
-        ./autogen.sh
-    fi
-
-    ./configure --prefix="$PREFIX" \
-                --disable-shared \
-                --enable-static \
-                --without-python \
-                --without-icu \
-                --with-zlib="$PREFIX" \
-                --with-lzma="$PREFIX"
-    make -j$(nproc)
-    make install
+    rm -rf build
+    cmake -S . -B build \
+        -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DLIBXML2_WITH_PYTHON=OFF \
+        -DLIBXML2_WITH_ICU=OFF \
+        -DLIBXML2_WITH_ZLIB=ON \
+        -DLIBXML2_WITH_LZMA=ON \
+        -DLIBXML2_WITH_PROGRAMS=OFF \
+        -DCMAKE_PREFIX_PATH="$PREFIX"
+    cmake --build build -j$(nproc)
+    cmake --install build
     cd ..
 }
 
@@ -402,16 +411,14 @@ build_libraqm() {
     checkout_repo_tag "libraqm" "$LIBRAQM_REPO" "$LIBRAQM_TAG"
 
     cd libraqm
-    if [ ! -f "configure" ]; then
-        log_info "Generating libraqm configure script..."
-        ./autogen.sh
-    fi
-
-    ./configure --prefix="$PREFIX" \
-                --disable-shared \
-                --enable-static
-    make -j$(nproc)
-    make install
+    rm -rf build
+    meson setup build \
+        --prefix="$PREFIX" \
+        --libdir=lib \
+        --default-library=static \
+        --buildtype=release
+    ninja -C build
+    ninja -C build install
     cd ..
 }
 
@@ -451,6 +458,88 @@ build_openexr() {
         -DCMAKE_PREFIX_PATH="$PREFIX"
     cmake --build build -j$(nproc)
     cmake --install build
+    cd ..
+}
+
+build_libde265() {
+    log_info "Building libde265 (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "libde265" "$LIBDE265_REPO" "$LIBDE265_TAG"
+
+    cd libde265
+    rm -rf build
+    cmake -S . -B build \
+        -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DENABLE_ENCODER=OFF
+    cmake --build build -j$(nproc)
+    cmake --install build
+    cd ..
+}
+
+build_libheif() {
+    log_info "Building libheif (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "libheif" "$LIBHEIF_REPO" "$LIBHEIF_TAG"
+
+    cd libheif
+    rm -rf build
+    cmake -S . -B build \
+        -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DBUILD_TESTING=OFF \
+        -DWITH_LIBDE265=ON \
+        -DWITH_X265=OFF \
+        -DWITH_AOM=OFF \
+        -DWITH_DAV1D=OFF \
+        -DWITH_RAV1E=OFF \
+        -DWITH_SvtEnc=OFF \
+        -DWITH_OpenH264=OFF \
+        -DWITH_JPEG_DECODER=OFF \
+        -DWITH_JPEG_ENCODER=OFF \
+        -DWITH_EXAMPLES=OFF \
+        -DWITH_GDK_PIXBUF=OFF \
+        -DWITH_REDUCED_VISIBILITY=ON \
+        -DCMAKE_PREFIX_PATH="$PREFIX"
+    cmake --build build -j$(nproc)
+    cmake --install build
+    cd ..
+}
+
+build_libraw() {
+    log_info "Building LibRaw (static)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "LibRaw" "$LIBRAW_REPO" "$LIBRAW_TAG"
+
+    cd LibRaw
+
+    # Ensure we do not reuse stale configure/cache state from previous attempts.
+    if [ -f "Makefile" ]; then
+        make distclean >/dev/null 2>&1 || true
+    fi
+    rm -f config.cache
+
+    if [ ! -f "configure" ]; then
+        if [ -f "autogen.sh" ]; then
+            log_info "Generating LibRaw configure script..."
+            ./autogen.sh
+        else
+            autoreconf -fi
+        fi
+    fi
+
+    CXX="${CXX:-g++}" CXXLD="${CXX:-g++}" LIBS="${LIBS:-} -lstdc++" ./configure --prefix="$PREFIX" \
+                --disable-shared \
+                --enable-static \
+                --enable-examples=no \
+                --enable-openmp=no
+    make -j$(nproc)
+    make install
     cd ..
 }
 
@@ -643,46 +732,75 @@ build_imagemagick() {
     # Export library paths - force static linking.
     export LDFLAGS="-static -static-libgcc -L$PREFIX/lib -L$PREFIX/lib64"
 
-    if ! pkg-config --exists zlib libpng libtiff-4 liblzma libxml-2.0 libzip raqm OpenEXR; then
-        log_error "Required static pkg-config metadata for zlib/libpng/libtiff/liblzma/libxml2/libzip/raqm/OpenEXR not found in $PREFIX"
+    local required_pkgs=(zlib libpng libtiff-4 liblzma libxml-2.0 libzip raqm OpenEXR)
+    local libraw_pkg=""
+    if [[ "$FULL_DELEGATES" == "true" ]]; then
+        if pkg-config --exists libraw_r; then
+            libraw_pkg="libraw_r"
+        elif pkg-config --exists libraw; then
+            libraw_pkg="libraw"
+        else
+            log_error "Required static pkg-config metadata missing: libraw_r/libraw"
+            exit 1
+        fi
+
+        required_pkgs+=(libde265 libheif "$libraw_pkg")
+    fi
+
+    if ! pkg-config --exists "${required_pkgs[@]}"; then
+        log_error "Required static pkg-config metadata missing: ${required_pkgs[*]}"
         exit 1
     fi
 
-    export LIBS="$(pkg-config --libs --static zlib libpng libtiff-4 libxml-2.0 libzip raqm OpenEXR) ${LIBS:-}"
+    export LIBS="$(pkg-config --libs --static "${required_pkgs[@]}") ${LIBS:-}"
 
     # Avoid stale tools from previous runs (for example Magick++-config).
     rm -rf "$PREFIX/imagemagick"
     
     log_info "Running configure with full static linking (core utilities only)..."
-    ./configure \
-        --prefix="$PREFIX/imagemagick" \
-        --enable-static \
-        --disable-shared \
-        --without-magick-plus-plus \
-        --with-perl=no \
-        --without-x \
-        --disable-openmp \
-        --with-quantum-depth=16 \
-        --enable-hdri \
-        --with-zlib=yes \
-        --with-bzlib=yes \
-        --with-zstd=yes \
-        --with-jpeg=yes \
-        --with-png=yes \
-        --with-openjp2=yes \
-        --with-lcms=yes \
-        --with-lzma=yes \
-        --with-openexr=yes \
-        --with-raqm=yes \
-        --with-zip=yes \
-        --with-freetype=yes \
-        --with-webp=yes \
-        --with-tiff=yes \
-        --with-fontconfig=yes \
-        --with-xml=yes \
-        --disable-docs \
-        --disable-dependency-tracking \
+    local configure_args=(
+        --prefix="$PREFIX/imagemagick"
+        --enable-static
+        --disable-shared
+        --without-magick-plus-plus
+        --with-perl=no
+        --without-x
+        --disable-openmp
+        --with-quantum-depth=16
+        --enable-hdri
+        --with-zlib=yes
+        --with-bzlib=yes
+        --with-zstd=yes
+        --with-jpeg=yes
+        --with-png=yes
+        --with-openjp2=yes
+        --with-lcms=yes
+        --with-lzma=yes
+        --with-openexr=yes
+        --with-raqm=yes
+        --with-zip=yes
+        --with-freetype=yes
+        --with-webp=yes
+        --with-tiff=yes
+        --with-fontconfig=yes
+        --with-xml=yes
+        --disable-docs
+        --disable-dependency-tracking
         --enable-cipher
+    )
+
+    if [[ "$FULL_DELEGATES" == "true" ]]; then
+        configure_args+=(
+            --with-heic=yes
+            --with-raw=yes
+            --with-jxl=yes
+            --with-rsvg=yes
+            --with-pango=yes
+            --with-lqr=yes
+        )
+    fi
+
+    ./configure "${configure_args[@]}"
     
     log_info "Compiling ImageMagick with full static linking (using $(nproc) cores)..."
     make -j$(nproc) LDFLAGS="-all-static -L$PREFIX/lib -L$PREFIX/lib64"
@@ -791,6 +909,9 @@ This build includes everything needed:
 - libraqm
 - Imath
 - OpenEXR
+- libde265
+- libheif
+- LibRaw
 - freetype
 - harfbuzz
 - libwebp
@@ -943,11 +1064,14 @@ Build Process:
     15. Builds libraqm statically (autotools)
     16. Builds Imath statically (cmake)
     17. Builds OpenEXR statically (cmake)
-    18. Builds libwebp statically (autotools)
-    19. Builds libtiff statically (autotools)
-    20. Builds libxml2 statically (autotools)
-    21. Builds fontconfig statically (autotools)
-    22. Builds ImageMagick core utilities statically with all dependencies
+    18. Builds libde265 statically (cmake)
+    19. Builds libheif statically (cmake)
+    20. Builds LibRaw statically (cmake)
+    21. Builds libwebp statically (autotools)
+    22. Builds libtiff statically (autotools)
+    23. Builds libxml2 statically (autotools)
+    24. Builds fontconfig statically (autotools)
+    25. Builds ImageMagick core utilities statically with all dependencies
 
 Features:
     ✓ Fully static binaries - everything embedded
@@ -966,6 +1090,7 @@ Notes:
     - First build will take significant time (~45-90 minutes)
     - Subsequent builds are faster due to cached dependencies
     - Binaries are smaller (~8-15MB per tool vs 15-25MB with bindings)
+    - Set FULL_DELEGATES=true to attempt additional delegates (HEIC/RAW/JXL/RSVG/PANGO/LQR)
     
 To clean up build artifacts:
     rm -rf build-work/
@@ -986,6 +1111,7 @@ trap cleanup_on_error ERR
 main() {
     log_info "ImageMagick Fully Static Core Utilities Build"
     log_info "Tag: $RELEASE_TAG, Architecture: $TARGET_ARCH"
+    log_info "FULL_DELEGATES: $FULL_DELEGATES"
 
     load_dependency_lock
     
@@ -1065,6 +1191,9 @@ main() {
     build_libraqm
     build_imath
     build_openexr
+    build_libde265
+    build_libheif
+    build_libraw
     build_webp
     build_tiff
     build_libxml2

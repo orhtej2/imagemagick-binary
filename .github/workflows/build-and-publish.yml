@@ -14,6 +14,11 @@ name: Build and Publish ImageMagick Binaries
         description: Specific ImageMagick tag to build (leave empty for latest)
         required: false
         type: string
+      full_delegates:
+        description: Enable fuller delegate set (HEIC/RAW/JXL/RSVG/PANGO/LQR attempts)
+        required: false
+        default: true
+        type: boolean
 
 jobs:
   check-and-build:
@@ -69,6 +74,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build ImageMagick for amd64
+        env:
+          FULL_DELEGATES: ${{ github.event.inputs.full_delegates || 'true' }}
         run: |
           set -euxo pipefail
           chmod +x ./build.sh
@@ -97,6 +104,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build ImageMagick for arm64
+        env:
+          FULL_DELEGATES: ${{ github.event.inputs.full_delegates || 'true' }}
         run: |
           set -euxo pipefail
           chmod +x ./build.sh
@@ -198,6 +207,9 @@ jobs:
             printf '%-18s %-60s %s\n' "libraqm" "$LIBRAQM_REPO" "$LIBRAQM_TAG"
             printf '%-18s %-60s %s\n' "imath" "$IMATH_REPO" "$IMATH_TAG"
             printf '%-18s %-60s %s\n' "openexr" "$OPENEXR_REPO" "$OPENEXR_TAG"
+            printf '%-18s %-60s %s\n' "libde265" "$LIBDE265_REPO" "$LIBDE265_TAG"
+            printf '%-18s %-60s %s\n' "libheif" "$LIBHEIF_REPO" "$LIBHEIF_TAG"
+            printf '%-18s %-60s %s\n' "libraw" "$LIBRAW_REPO" "$LIBRAW_TAG"
             printf '%-18s %-60s %s\n' "freetype" "$FREETYPE_REPO" "$FREETYPE_TAG"
             printf '%-18s %-60s %s\n' "harfbuzz" "$HARFBUZZ_REPO" "$HARFBUZZ_TAG"
             printf '%-18s %-60s %s\n' "libwebp" "$LIBWEBP_REPO" "$LIBWEBP_TAG"
@@ -233,6 +245,9 @@ jobs:
             printf '| %s | %s | %s | [link](%s) |\n' "libraqm" "[repo]($(repo_http_url "$LIBRAQM_REPO"))" "$LIBRAQM_TAG" "$(repo_release_link "$LIBRAQM_REPO" "$LIBRAQM_TAG")"
             printf '| %s | %s | %s | [link](%s) |\n' "imath" "[repo]($(repo_http_url "$IMATH_REPO"))" "$IMATH_TAG" "$(repo_release_link "$IMATH_REPO" "$IMATH_TAG")"
             printf '| %s | %s | %s | [link](%s) |\n' "openexr" "[repo]($(repo_http_url "$OPENEXR_REPO"))" "$OPENEXR_TAG" "$(repo_release_link "$OPENEXR_REPO" "$OPENEXR_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "libde265" "[repo]($(repo_http_url "$LIBDE265_REPO"))" "$LIBDE265_TAG" "$(repo_release_link "$LIBDE265_REPO" "$LIBDE265_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "libheif" "[repo]($(repo_http_url "$LIBHEIF_REPO"))" "$LIBHEIF_TAG" "$(repo_release_link "$LIBHEIF_REPO" "$LIBHEIF_TAG")"
+            printf '| %s | %s | %s | [link](%s) |\n' "libraw" "[repo]($(repo_http_url "$LIBRAW_REPO"))" "$LIBRAW_TAG" "$(repo_release_link "$LIBRAW_REPO" "$LIBRAW_TAG")"
             printf '| %s | %s | %s | [link](%s) |\n' "freetype" "[repo]($(repo_http_url "$FREETYPE_REPO"))" "$FREETYPE_TAG" "$(repo_release_link "$FREETYPE_REPO" "$FREETYPE_TAG")"
             printf '| %s | %s | %s | [link](%s) |\n' "harfbuzz" "[repo]($(repo_http_url "$HARFBUZZ_REPO"))" "$HARFBUZZ_TAG" "$(repo_release_link "$HARFBUZZ_REPO" "$HARFBUZZ_TAG")"
             printf '| %s | %s | %s | [link](%s) |\n' "libwebp" "[repo]($(repo_http_url "$LIBWEBP_REPO"))" "$LIBWEBP_TAG" "$(repo_release_link "$LIBWEBP_REPO" "$LIBWEBP_TAG")"
