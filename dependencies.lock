@@ -34,6 +34,9 @@ LIBXML2_TAG="v2.15.3"
 LIBZIP_REPO="https://github.com/nih-at/libzip.git"
 LIBZIP_TAG="v1.11.4"
 
+MESON_REPO="https://github.com/mesonbuild/meson.git"
+MESON_TAG="1.11.2"
+
 PCRE2_REPO="https://github.com/PCRE2Project/pcre2.git"
 PCRE2_TAG="pcre2-10.47"
 
@@ -44,7 +47,7 @@ GLIB_REPO="https://github.com/GNOME/glib.git"
 GLIB_TAG="2.88.2"
 
 GVDB_REPO="https://gitlab.gnome.org/GNOME/gvdb.git"
-GVDB_REF="0854af0fdb6d527a8d1999835ac2c5059976c210"
+GVDB_REF="c6f2359cc1d00f16e0a0e2527fa0bc1882b8b5ab"
 
 LIBLQR_REPO="https://github.com/carlobaldassi/liblqr.git"
 LIBLQR_TAG="v0.4.3"

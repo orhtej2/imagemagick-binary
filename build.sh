@@ -20,6 +20,7 @@ BUILD_DIR="${PWD}/build"
 PREFIX="${WORK_DIR}/install"
 LOCK_FILE="${PWD}/dependencies.lock"
 HOST_MULTIARCH="$(gcc -dumpmachine 2>/dev/null || true)"
+MESON_BIN="meson"
 PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig:$PREFIX/share/pkgconfig"
 
 if [ -n "$HOST_MULTIARCH" ]; then
@@ -103,6 +104,7 @@ load_dependency_lock() {
         XZ_REPO XZ_TAG
         LIBXML2_REPO LIBXML2_TAG
         LIBZIP_REPO LIBZIP_TAG
+        MESON_REPO MESON_TAG
         PCRE2_REPO PCRE2_TAG
         LIBFFI_REPO LIBFFI_TAG
         GLIB_REPO GLIB_TAG
@@ -193,7 +195,7 @@ install_dependencies() {
         perl \
         python3 \
         python3-pip \
-        meson \
+        python3-venv \
         ninja-build \
         gperf \
         autopoint \
@@ -330,6 +332,23 @@ build_openjpeg() {
     cd ..
 }
 
+build_meson() {
+    log_info "Building Meson (vendored)..."
+    cd "$WORK_DIR"
+
+    checkout_repo_tag "meson" "$MESON_REPO" "$MESON_TAG"
+
+    cd meson
+    rm -rf .venv
+    python3 -m venv .venv
+    .venv/bin/python -m pip install --upgrade pip setuptools wheel
+    .venv/bin/python -m pip install .
+    MESON_BIN="$PWD/.venv/bin/meson"
+    export MESON_BIN
+    log_info "Using vendored meson: $($MESON_BIN --version)"
+    cd ..
+}
+
 build_lcms2() {
     log_info "Building lcms2 (static)..."
     cd "$WORK_DIR"
@@ -393,7 +412,7 @@ build_libxml2() {
         -DLIBXML2_WITH_PYTHON=OFF \
         -DLIBXML2_WITH_ICU=OFF \
         -DLIBXML2_WITH_ZLIB=ON \
-        -DLIBXML2_WITH_LZMA=ON \
+        -DLIBXML2_WITH_TESTS=OFF \
         -DLIBXML2_WITH_PROGRAMS=OFF \
         -DCMAKE_PREFIX_PATH="$PREFIX"
     cmake --build build -j$(nproc)
@@ -490,7 +509,7 @@ build_glib() {
     mkdir -p subprojects
     checkout_repo_ref "subprojects/gvdb" "$GVDB_REPO" "$GVDB_REF"
 
-    meson setup build \
+    "$MESON_BIN" setup build \
         --prefix="$PREFIX" \
         --libdir=lib \
         --default-library=static \
@@ -546,7 +565,7 @@ build_fribidi() {
 
     cd fribidi
     rm -rf build
-    meson setup build \
+    "$MESON_BIN" setup build \
         --prefix="$PREFIX" \
         --libdir=lib \
         --default-library=static \
@@ -567,7 +586,7 @@ build_libraqm() {
 
     cd libraqm
     rm -rf build
-    meson setup build \
+    "$MESON_BIN" setup build \
         --prefix="$PREFIX" \
         --libdir=lib \
         --default-library=static \
@@ -748,7 +767,7 @@ build_harfbuzz() {
     cd harfbuzz
 
     rm -rf build
-    meson setup build \
+    "$MESON_BIN" setup build \
         --prefix="$PREFIX" \
         --libdir=lib \
         --default-library=static \
@@ -1262,25 +1281,26 @@ Build Process:
     9. Builds lcms2 statically (autotools)
     10. Builds xz/liblzma statically (autotools)
     11. Builds libzip statically (cmake)
-    12. Builds PCRE2 statically (cmake)
-    13. Builds libffi statically (autotools)
-    14. Builds glib-2.0 statically (meson, with vendored gvdb)
-    15. Builds liblqr statically (autotools)
-    16. Builds freetype statically (pass 1, without harfbuzz)
-    17. Builds harfbuzz statically
-    18. Rebuilds freetype statically (pass 2, with harfbuzz)
-    19. Builds fribidi statically (meson)
-    20. Builds libraqm statically (meson)
-    21. Builds Imath statically (cmake)
-    22. Builds OpenEXR statically (cmake)
-    23. Builds libde265 statically (cmake)
-    24. Builds libheif statically (cmake)
-    25. Builds LibRaw statically (autotools)
-    26. Builds libwebp statically (autotools)
-    27. Builds libtiff statically (autotools)
-    28. Builds libxml2 statically (cmake)
-    29. Builds fontconfig statically (autotools)
-    30. Builds ImageMagick core utilities statically with all dependencies
+    12. Builds Meson (vendored python environment)
+    13. Builds PCRE2 statically (cmake)
+    14. Builds libffi statically (autotools)
+    15. Builds glib-2.0 statically (meson, with vendored gvdb)
+    16. Builds liblqr statically (autotools)
+    17. Builds freetype statically (pass 1, without harfbuzz)
+    18. Builds harfbuzz statically
+    19. Rebuilds freetype statically (pass 2, with harfbuzz)
+    20. Builds fribidi statically (meson)
+    21. Builds libraqm statically (meson)
+    22. Builds Imath statically (cmake)
+    23. Builds OpenEXR statically (cmake)
+    24. Builds libde265 statically (cmake)
+    25. Builds libheif statically (cmake)
+    26. Builds LibRaw statically (autotools)
+    27. Builds libwebp statically (autotools)
+    28. Builds libtiff statically (autotools)
+    29. Builds libxml2 statically (cmake)
+    30. Builds fontconfig statically (autotools)
+    31. Builds ImageMagick core utilities statically with all dependencies
 
 Features:
     ✓ Fully static binaries - everything embedded
@@ -1394,6 +1414,7 @@ main() {
     build_lcms2
     build_xz
     build_libzip
+    build_meson
     build_pcre2
     build_libffi
     build_glib

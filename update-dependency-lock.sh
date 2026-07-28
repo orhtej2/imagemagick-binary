@@ -64,6 +64,7 @@ update_var_if_newer "LCMS2_TAG" "LCMS2_REPO" '^lcms2\.[0-9]+$'
 update_var_if_newer "XZ_TAG" "XZ_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
 update_var_if_newer "LIBXML2_TAG" "LIBXML2_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
 update_var_if_newer "LIBZIP_TAG" "LIBZIP_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
+update_var_if_newer "MESON_TAG" "MESON_REPO" '^v?[0-9]+(\.[0-9]+){1,3}$'
 update_var_if_newer "PCRE2_TAG" "PCRE2_REPO" '^pcre2-[0-9]+(\.[0-9]+){2}$'
 update_var_if_newer "LIBFFI_TAG" "LIBFFI_REPO" '^v?[0-9]+(\.[0-9]+){2,3}$'
 update_var_if_newer "GLIB_TAG" "GLIB_REPO" '^[0-9]+\.[0-9]*[02468]\.[0-9]+$'
@@ -117,6 +118,9 @@ LIBXML2_TAG="$LIBXML2_TAG"
 
 LIBZIP_REPO="$LIBZIP_REPO"
 LIBZIP_TAG="$LIBZIP_TAG"
+
+MESON_REPO="$MESON_REPO"
+MESON_TAG="$MESON_TAG"
 
 PCRE2_REPO="$PCRE2_REPO"
 PCRE2_TAG="$PCRE2_TAG"
