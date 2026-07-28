@@ -2,8 +2,8 @@ Prebuilt [ImageMagick](https://github.com/imagemagick/imagemagick) for Debian Bo
 
 Deps used:
 
-| Library | Repository | Tag |
-| --- | --- | --- |
+| Library | Repository |
+| --- | --- |
 | zlib | [repo](https://github.com/madler/zlib) |
 | libdeflate | [repo](https://github.com/ebiggers/libdeflate) |
 | libjpeg-turbo | [repo](https://github.com/libjpeg-turbo/libjpeg-turbo) |
