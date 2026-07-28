@@ -1,5 +1,5 @@
 # Pinned dependency sources and tags for build.sh
-# Update with: ./update-dependency-lock.sh
+# Update with: scripts/update-dependency-lock.sh
 
 ZLIB_REPO="https://github.com/madler/zlib.git"
 ZLIB_TAG="v1.3.2"
