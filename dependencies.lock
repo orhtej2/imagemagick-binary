@@ -5,7 +5,7 @@ ZLIB_REPO="https://github.com/madler/zlib.git"
 ZLIB_TAG="v1.3.2"
 
 LIBDEFLATE_REPO="https://github.com/ebiggers/libdeflate.git"
-LIBDEFLATE_TAG="v1.24"
+LIBDEFLATE_TAG="v1.25"
 
 LIBJPEG_TURBO_REPO="https://github.com/libjpeg-turbo/libjpeg-turbo.git"
 LIBJPEG_TURBO_TAG="3.2.0"
@@ -23,13 +23,13 @@ OPENJPEG_REPO="https://github.com/uclouvain/openjpeg.git"
 OPENJPEG_TAG="v2.5.4"
 
 LCMS2_REPO="https://github.com/mm2/Little-CMS.git"
-LCMS2_TAG="lcms2.17"
+LCMS2_TAG="lcms2.19"
 
 XZ_REPO="https://github.com/tukaani-project/xz.git"
-XZ_TAG="v5.8.1"
+XZ_TAG="v5.8.3"
 
 LIBXML2_REPO="https://gitlab.gnome.org/GNOME/libxml2.git"
-LIBXML2_TAG="v2.14.6"
+LIBXML2_TAG="v2.15.3"
 
 LIBZIP_REPO="https://github.com/nih-at/libzip.git"
 LIBZIP_TAG="v1.11.4"
@@ -38,10 +38,10 @@ PCRE2_REPO="https://github.com/PCRE2Project/pcre2.git"
 PCRE2_TAG="pcre2-10.47"
 
 LIBFFI_REPO="https://github.com/libffi/libffi.git"
-LIBFFI_TAG="v3.5.2"
+LIBFFI_TAG="v3.7.1"
 
 GLIB_REPO="https://github.com/GNOME/glib.git"
-GLIB_TAG="2.74.7"
+GLIB_TAG="2.88.2"
 
 GVDB_REPO="https://gitlab.gnome.org/GNOME/gvdb.git"
 GVDB_REF="0854af0fdb6d527a8d1999835ac2c5059976c210"
@@ -53,22 +53,22 @@ FRIBIDI_REPO="https://github.com/fribidi/fribidi.git"
 FRIBIDI_TAG="v1.0.16"
 
 LIBRAQM_REPO="https://github.com/HOST-Oman/libraqm.git"
-LIBRAQM_TAG="v0.10.3"
+LIBRAQM_TAG="v0.11.0"
 
 IMATH_REPO="https://github.com/AcademySoftwareFoundation/Imath.git"
-IMATH_TAG="v3.1.12"
+IMATH_TAG="v3.2.2"
 
 OPENEXR_REPO="https://github.com/AcademySoftwareFoundation/openexr.git"
-OPENEXR_TAG="v3.3.5"
+OPENEXR_TAG="v3.4.13"
 
 LIBDE265_REPO="https://github.com/strukturag/libde265.git"
-LIBDE265_TAG="v1.0.16"
+LIBDE265_TAG="v1.1.1"
 
 LIBHEIF_REPO="https://github.com/strukturag/libheif.git"
-LIBHEIF_TAG="v1.20.2"
+LIBHEIF_TAG="v1.23.1"
 
 LIBRAW_REPO="https://github.com/LibRaw/LibRaw.git"
-LIBRAW_TAG="0.21.4"
+LIBRAW_TAG="0.22.2"
 
 FREETYPE_REPO="https://github.com/freetype/freetype.git"
 FREETYPE_TAG="VER-2-14-3"
