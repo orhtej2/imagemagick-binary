@@ -84,7 +84,7 @@ update_var_if_newer "FONTCONFIG_TAG" "FONTCONFIG_REPO" '^[0-9]+(\.[0-9]+){2,3}$'
 
 cat > "$LOCK_FILE" <<EOF
 # Pinned dependency sources and tags for build.sh
-# Update with: scripts/update-dependency-lock.sh
+# Update with: ./update-dependency-lock.sh
 
 ZLIB_REPO="$ZLIB_REPO"
 ZLIB_TAG="$ZLIB_TAG"
