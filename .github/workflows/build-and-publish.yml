@@ -138,13 +138,13 @@ jobs:
           fetch-depth: 0
 
       - name: Download amd64 artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: imagemagick-amd64
           path: /tmp/artifacts/amd64
 
       - name: Download arm64 artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: imagemagick-arm64
           path: /tmp/artifacts/arm64
