@@ -89,7 +89,7 @@ jobs:
           ls -lh "$archive"
 
       - name: Upload amd64 artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: imagemagick-amd64
           path: build/imagemagick-${{ needs.check-and-build.outputs.release_tag }}-linux-amd64.tar.gz
@@ -119,7 +119,7 @@ jobs:
           ls -lh "$archive"
 
       - name: Upload arm64 artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: imagemagick-arm64
           path: build/imagemagick-${{ needs.check-and-build.outputs.release_tag }}-linux-arm64.tar.gz
