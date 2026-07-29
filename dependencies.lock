@@ -44,7 +44,7 @@ LIBFFI_REPO="https://github.com/libffi/libffi.git"
 LIBFFI_TAG="v3.7.1"
 
 GLIB_REPO="https://github.com/GNOME/glib.git"
-GLIB_TAG="2.88.2"
+GLIB_TAG="2.88.3"
 
 GVDB_REPO="https://gitlab.gnome.org/GNOME/gvdb.git"
 GVDB_REF="c6f2359cc1d00f16e0a0e2527fa0bc1882b8b5ab"
