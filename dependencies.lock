@@ -62,7 +62,7 @@ IMATH_REPO="https://github.com/AcademySoftwareFoundation/Imath.git"
 IMATH_TAG="v3.2.2"
 
 OPENEXR_REPO="https://github.com/AcademySoftwareFoundation/openexr.git"
-OPENEXR_TAG="v3.4.13"
+OPENEXR_TAG="v3.4.14"
 
 LIBDE265_REPO="https://github.com/strukturag/libde265.git"
 LIBDE265_TAG="v1.1.1"
@@ -86,4 +86,4 @@ LIBTIFF_REPO="https://gitlab.com/libtiff/libtiff.git"
 LIBTIFF_TAG="v4.7.2"
 
 FONTCONFIG_REPO="https://gitlab.freedesktop.org/fontconfig/fontconfig.git"
-FONTCONFIG_TAG="2.18.2"
+FONTCONFIG_TAG="2.18.3"
