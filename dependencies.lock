@@ -41,7 +41,7 @@ PCRE2_REPO="https://github.com/PCRE2Project/pcre2.git"
 PCRE2_TAG="pcre2-10.47"
 
 LIBFFI_REPO="https://github.com/libffi/libffi.git"
-LIBFFI_TAG="v3.7.1"
+LIBFFI_TAG="v3.8.0"
 
 GLIB_REPO="https://github.com/GNOME/glib.git"
 GLIB_TAG="2.88.3"
