@@ -35,7 +35,7 @@ LIBZIP_REPO="https://github.com/nih-at/libzip.git"
 LIBZIP_TAG="v1.11.4"
 
 MESON_REPO="https://github.com/mesonbuild/meson.git"
-MESON_TAG="1.11.2"
+MESON_TAG="1.12.0"
 
 PCRE2_REPO="https://github.com/PCRE2Project/pcre2.git"
 PCRE2_TAG="pcre2-10.47"
