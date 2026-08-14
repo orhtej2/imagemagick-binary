@@ -77,7 +77,7 @@ FREETYPE_REPO="https://github.com/freetype/freetype.git"
 FREETYPE_TAG="VER-2-14-3"
 
 HARFBUZZ_REPO="https://github.com/harfbuzz/harfbuzz.git"
-HARFBUZZ_TAG="14.3.0"
+HARFBUZZ_TAG="14.3.1"
 
 LIBWEBP_REPO="https://github.com/webmproject/libwebp.git"
 LIBWEBP_TAG="v1.6.0"
