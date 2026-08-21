@@ -59,7 +59,7 @@ LIBRAQM_REPO="https://github.com/HOST-Oman/libraqm.git"
 LIBRAQM_TAG="v0.11.0"
 
 IMATH_REPO="https://github.com/AcademySoftwareFoundation/Imath.git"
-IMATH_TAG="v3.2.2"
+IMATH_TAG="v3.2.3"
 
 OPENEXR_REPO="https://github.com/AcademySoftwareFoundation/openexr.git"
 OPENEXR_TAG="v3.4.14"
