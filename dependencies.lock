@@ -5,7 +5,7 @@ ZLIB_REPO="https://github.com/madler/zlib.git"
 ZLIB_TAG="v1.3.2"
 
 LIBDEFLATE_REPO="https://github.com/ebiggers/libdeflate.git"
-LIBDEFLATE_TAG="v1.25"
+LIBDEFLATE_TAG="v1.26"
 
 LIBJPEG_TURBO_REPO="https://github.com/libjpeg-turbo/libjpeg-turbo.git"
 LIBJPEG_TURBO_TAG="3.2.0"
