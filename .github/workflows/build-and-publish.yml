@@ -26,7 +26,10 @@ jobs:
     permissions:
       contents: read
     outputs:
-      should_build: ${{ steps.check-release.outputs.should_build }}
+      should_build_any: ${{ steps.check-release.outputs.should_build_any }}
+      should_build_amd64: ${{ steps.check-release.outputs.should_build_amd64 }}
+      should_build_arm64: ${{ steps.check-release.outputs.should_build_arm64 }}
+      should_build_armv7: ${{ steps.check-release.outputs.should_build_armv7 }}
       release_tag: ${{ steps.check-release.outputs.release_tag }}
     steps:
       - name: Checkout repository
@@ -43,6 +46,11 @@ jobs:
         run: |
           set -euxo pipefail
 
+          echo "should_build_amd64=false" >> "$GITHUB_OUTPUT"
+          echo "should_build_arm64=false" >> "$GITHUB_OUTPUT"
+          echo "should_build_armv7=false" >> "$GITHUB_OUTPUT"
+          echo "should_build_any=false" >> "$GITHUB_OUTPUT"
+
           RELEASE_TAG=""
           if [ -n "$MANUAL_TAG" ]; then
             RELEASE_TAG="$MANUAL_TAG"
@@ -55,7 +63,6 @@ jobs:
               echo "Failed to resolve latest ImageMagick release on attempt $attempt; retrying..."
               if [ "$attempt" -eq 3 ]; then
                 echo "Unable to determine latest upstream ImageMagick tag after 3 attempts"
-                echo "should_build=false" >> "$GITHUB_OUTPUT"
                 exit 0
               fi
               sleep 5
@@ -64,7 +71,6 @@ jobs:
 
           if [ -z "$RELEASE_TAG" ] || [ "$RELEASE_TAG" = "null" ]; then
             echo "Invalid release tag resolved: ${RELEASE_TAG:-<empty>}"
-            echo "should_build=false" >> "$GITHUB_OUTPUT"
             echo "Bailing out: upstream release tag could not be determined reliably"
             exit 0
           fi
@@ -77,21 +83,44 @@ jobs:
             if [ "$FORCE_BUILD" != "true" ]; then
               for asset_attempt in 1 2 3; do
                 if gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' >/tmp/release-assets.txt 2>/tmp/gh_release_assets.err; then
-                  ARMV7_ASSET="imagemagick-${RELEASE_TAG}-linux-armv7.tar.gz"
-                  if grep -Fxq "$ARMV7_ASSET" /tmp/release-assets.txt; then
-                    echo "armv7 asset already exists in release $RELEASE_TAG"
-                    echo "should_build=false" >> "$GITHUB_OUTPUT"
-                    echo "Skipping build because the release tag and armv7 artifact already exist"
-                    exit 0
-                  fi
-                  echo "armv7 asset missing from existing release $RELEASE_TAG; rebuilding it"
-                  break
+                  for arch in amd64 arm64 armv7; do
+                    case "$arch" in
+                      amd64)
+                        ASSET="imagemagick-${RELEASE_TAG}-linux-amd64.tar.gz"
+                        ;;
+                      arm64)
+                        ASSET="imagemagick-${RELEASE_TAG}-linux-arm64.tar.gz"
+                        ;;
+                      armv7)
+                        ASSET="imagemagick-${RELEASE_TAG}-linux-armv7.tar.gz"
+                        ;;
+                    esac
+
+                    if grep -Fxq "$ASSET" /tmp/release-assets.txt; then
+                      echo "$arch asset already exists for $RELEASE_TAG"
+                    else
+                      echo "$arch asset missing from $RELEASE_TAG; rebuilding it"
+                      case "$arch" in
+                        amd64) echo "should_build_amd64=true" >> "$GITHUB_OUTPUT" ;;
+                        arm64) echo "should_build_arm64=true" >> "$GITHUB_OUTPUT" ;;
+                        armv7) echo "should_build_armv7=true" >> "$GITHUB_OUTPUT" ;;
+                      esac
+                    fi
+                  done
+
+                  for arch_flag in should_build_amd64 should_build_arm64 should_build_armv7; do
+                    if grep -q "^${arch_flag}=true$" "$GITHUB_OUTPUT"; then
+                      echo "should_build_any=true" >> "$GITHUB_OUTPUT"
+                      break
+                    fi
+                  done
+
+                  exit 0
                 fi
 
                 echo "Failed to fetch release assets for $RELEASE_TAG on attempt $asset_attempt; retrying..."
                 if [ "$asset_attempt" -eq 3 ]; then
                   echo "Unable to confirm release asset state for $RELEASE_TAG after 3 attempts; bailing out to avoid invalid state"
-                  echo "should_build=false" >> "$GITHUB_OUTPUT"
                   echo "Bailing out: release metadata is ambiguous or invalid; manual intervention required"
                   exit 0
                 fi
@@ -100,11 +129,14 @@ jobs:
             fi
           fi
 
-          echo "should_build=true" >> "$GITHUB_OUTPUT"
+          echo "should_build_amd64=true" >> "$GITHUB_OUTPUT"
+          echo "should_build_arm64=true" >> "$GITHUB_OUTPUT"
+          echo "should_build_armv7=true" >> "$GITHUB_OUTPUT"
+          echo "should_build_any=true" >> "$GITHUB_OUTPUT"
 
   build-amd64:
     needs: check-and-build
-    if: needs.check-and-build.outputs.should_build == 'true'
+    if: needs.check-and-build.outputs.should_build_amd64 == 'true'
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
@@ -134,7 +166,7 @@ jobs:
 
   build-arm64:
     needs: check-and-build
-    if: needs.check-and-build.outputs.should_build == 'true'
+    if: needs.check-and-build.outputs.should_build_arm64 == 'true'
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout repository
@@ -164,7 +196,7 @@ jobs:
 
   build-armv7:
     needs: check-and-build
-    if: needs.check-and-build.outputs.should_build == 'true'
+    if: needs.check-and-build.outputs.should_build_armv7 == 'true'
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout repository
@@ -204,7 +236,7 @@ jobs:
 
   publish:
     needs: [check-and-build, build-amd64, build-arm64, build-armv7]
-    if: needs.check-and-build.outputs.should_build == 'true'
+    if: needs.check-and-build.outputs.should_build_any == 'true'
     runs-on: ubuntu-slim
     permissions:
       contents: write
@@ -215,18 +247,21 @@ jobs:
           fetch-depth: 0
 
       - name: Download amd64 artifact
+        if: needs.build-amd64.result == 'success'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: imagemagick-amd64
           path: /tmp/artifacts/amd64
 
       - name: Download arm64 artifact
+        if: needs.build-arm64.result == 'success'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: imagemagick-arm64
           path: /tmp/artifacts/arm64
 
       - name: Download armv7 artifact
+        if: needs.build-armv7.result == 'success'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: imagemagick-armv7
@@ -378,21 +413,24 @@ jobs:
           BOM_FILE="/tmp/artifacts/imagemagick-${RELEASE_TAG}-dependencies.bom.txt"
           RELEASE_NOTES_FILE="/tmp/artifacts/imagemagick-${RELEASE_TAG}-release-notes.md"
 
+          UPLOAD_ARGS=("$BOM_FILE")
+          for archive in "$AMD64_ARCHIVE" "$ARM64_ARCHIVE" "$ARMV7_ARCHIVE"; do
+            if [ -f "$archive" ]; then
+              UPLOAD_ARGS+=("$archive")
+            fi
+          done
+
+          if [ "${#UPLOAD_ARGS[@]}" -eq 1 ]; then
+            echo "No built artifacts were downloaded for this release; only the BOM will be emitted."
+          fi
+
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release edit "$RELEASE_TAG" --notes-file "$RELEASE_NOTES_FILE"
-            gh release upload "$RELEASE_TAG" \
-              "$AMD64_ARCHIVE" \
-              "$ARM64_ARCHIVE" \
-              "$ARMV7_ARCHIVE" \
-              "$BOM_FILE" \
-              --clobber
+            gh release upload "$RELEASE_TAG" "${UPLOAD_ARGS[@]}" --clobber
           else
             gh release create "$RELEASE_TAG" \
               --target "${GITHUB_SHA}" \
               --title "ImageMagick $RELEASE_TAG" \
               --notes-file "$RELEASE_NOTES_FILE" \
-              "$AMD64_ARCHIVE" \
-              "$ARM64_ARCHIVE" \
-              "$ARMV7_ARCHIVE" \
-              "$BOM_FILE"
+              "${UPLOAD_ARGS[@]}"
           fi

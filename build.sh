@@ -21,7 +21,9 @@ BUILD_DIR="${PWD}/build"
 PREFIX="${WORK_DIR}/install"
 LOCK_FILE="${PWD}/dependencies.lock"
 HOST_MULTIARCH="$(gcc -dumpmachine 2>/dev/null || true)"
+BUILD_JOBS="${BUILD_JOBS:-$(nproc)}"
 MESON_BIN="meson"
+MESON_CROSS_FILE=""
 PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig:$PREFIX/share/pkgconfig"
 
 if [ -n "$HOST_MULTIARCH" ]; then
@@ -36,6 +38,7 @@ export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}"
 export PKG_CONFIG_LIBDIR="${PKG_CONFIG_LIBDIR}"
 export PKG_CONFIG_DIR=""
 export CPPFLAGS="-I$PREFIX/include"
+export LDFLAGS="-L$PREFIX/lib -L$PREFIX/lib64${HOST_MULTIARCH:+ -L$PREFIX/lib/$HOST_MULTIARCH}"
 export LD_LIBRARY_PATH="$PREFIX/lib${HOST_MULTIARCH:+:$PREFIX/lib/$HOST_MULTIARCH}:$LD_LIBRARY_PATH"
 
 # Additional compiler flags for full static linking
@@ -82,6 +85,44 @@ compiler_supports_flag() {
     local cc_bin="${CC:-gcc}"
 
     printf 'int main(void){return 0;}\n' | "$cc_bin" "$flag" -x c -c -o /dev/null - >/dev/null 2>&1
+}
+
+compiler_supports_armv7_fpu_flags() {
+    local cc_bin="${CC:-gcc}"
+
+    printf 'int main(void){return 0;}\n' | "$cc_bin" -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard -x c -c -o /dev/null - >/dev/null 2>&1
+}
+
+autotools_host_flags() {
+    if [ -n "${TARGET_TRIPLET:-}" ]; then
+        printf '%s' "--host=${TARGET_TRIPLET}"
+    fi
+}
+
+write_meson_cross_file() {
+    local cross_file="$WORK_DIR/meson-armv7-cross.txt"
+    mkdir -p "$WORK_DIR"
+    cat > "$cross_file" <<EOF
+[binaries]
+c = '${CC:-arm-linux-gnueabihf-gcc}'
+cpp = '${CXX:-arm-linux-gnueabihf-g++}'
+ar = '${AR:-arm-linux-gnueabihf-ar}'
+strip = '${STRIP:-arm-linux-gnueabihf-strip}'
+pkgconfig = 'pkg-config'
+exe_wrapper = ['qemu-arm-static', '-L', '/usr/arm-linux-gnueabihf']
+
+[host_machine]
+system = 'linux'
+cpu_family = 'arm'
+cpu = 'armv7'
+endian = 'little'
+
+[properties]
+needs_exe_wrapper = true
+EOF
+    MESON_CROSS_FILE="$cross_file"
+    export MESON_CROSS_FILE
+    printf '%s' "$cross_file"
 }
 
 load_dependency_lock() {
@@ -147,6 +188,9 @@ checkout_repo_tag() {
         git -C "$repo_dir" remote set-url origin "$repo_url"
         git -C "$repo_dir" fetch --depth 1 origin "refs/tags/$repo_tag:refs/tags/$repo_tag" || \
             git -C "$repo_dir" fetch --depth 1 origin "$repo_tag"
+        git -C "$repo_dir" checkout -f "$repo_tag"
+        git -C "$repo_dir" reset --hard "$repo_tag"
+        git -C "$repo_dir" clean -fdx
     else
         rm -rf "$repo_dir"
         log_info "Cloning $repo_dir at tag $repo_tag"
@@ -168,10 +212,16 @@ checkout_repo_ref() {
     git -C "$repo_dir" remote add origin "$repo_url"
     git -C "$repo_dir" fetch --depth 1 origin "$repo_ref"
     git -C "$repo_dir" checkout -f FETCH_HEAD
+    git -C "$repo_dir" clean -fdx
 }
 
 # Function to install build dependencies
 install_dependencies() {
+    if [ "${SKIP_APT_INSTALL:-false}" = "true" ]; then
+        log_warn "Skipping apt dependency installation (SKIP_APT_INSTALL=true)"
+        return 0
+    fi
+
     log_info "Installing build dependencies..."
     
     if ! command -v apt-get &> /dev/null; then
@@ -215,9 +265,9 @@ build_zlib() {
     cd zlib
     local zlib_cflags
     zlib_cflags="$(sanitize_no_werror_flags "$CFLAGS") -Wno-error"
-    CFLAGS="$zlib_cflags" ./configure --static --prefix="$PREFIX"
-    make -j$(nproc)
-    make install
+    CFLAGS="$zlib_cflags" ./configure --static --prefix="$PREFIX" $(autotools_host_flags)
+    make -j"$BUILD_JOBS"
+    make -j"$BUILD_JOBS" install
     cd ..
 }
 
@@ -237,8 +287,8 @@ build_libdeflate() {
         -DLIBDEFLATE_BUILD_GZIP=OFF \
         -DLIBDEFLATE_BUILD_TESTS=OFF \
         -DLIBDEFLATE_INSTALL=ON
-    cmake --build build -j$(nproc)
-    cmake --install build
+    cmake --build build --parallel "$BUILD_JOBS"
+    cmake --install build --parallel "$BUILD_JOBS"
     cd ..
 }
 
@@ -255,9 +305,10 @@ build_jpeg() {
            -DCMAKE_BUILD_TYPE=Release \
            -DENABLE_SHARED=OFF \
            -DENABLE_STATIC=ON \
+           -DWITH_SIMD=OFF \
            ..
-    make -j$(nproc)
-    make install
+    make -j"$BUILD_JOBS"
+    make -j"$BUILD_JOBS" install
     cd ../..
 }
 
@@ -276,9 +327,10 @@ build_png() {
     ./configure --prefix="$PREFIX" \
                 --disable-shared \
                 --enable-static \
-                --with-zlib-prefix="$PREFIX"
-    make -j$(nproc)
-    make install
+                --with-zlib-prefix="${PREFIX%/}/" \
+                $(autotools_host_flags)
+    make -j"$BUILD_JOBS"
+    make -j"$BUILD_JOBS" install
     cd ..
 }
 
@@ -289,9 +341,13 @@ build_bzip2() {
     checkout_repo_tag "bzip2" "$BZIP2_REPO" "$BZIP2_TAG"
 
     cd bzip2
+    local bzip2_cflags
+    bzip2_cflags="$(sanitize_no_werror_flags "$CFLAGS") -Wno-error -fPIC"
     make clean >/dev/null 2>&1 || true
-    make -j$(nproc) CFLAGS="$CFLAGS -fPIC"
-    make install PREFIX="$PREFIX"
+    # Explicitly avoid the default bzip2 'all' target, which includes the self-test.
+    # The self-test executes the armhf binary on the build host and fails without /lib/ld-linux-armhf.so.3.
+    make -j"$BUILD_JOBS" bzip2 bzip2recover libbz2.a CC="${CC:-gcc}" AR="${AR:-ar}" RANLIB="${RANLIB:-ranlib}" CFLAGS="$bzip2_cflags"
+    make -j"$BUILD_JOBS" install PREFIX="$PREFIX" CC="${CC:-gcc}" AR="${AR:-ar}" RANLIB="${RANLIB:-ranlib}"
     cd ..
 }
 
@@ -309,8 +365,8 @@ build_zstd() {
         -DZSTD_BUILD_PROGRAMS=OFF \
         -DZSTD_BUILD_SHARED=OFF \
         -DZSTD_BUILD_STATIC=ON
-    cmake --build build/cmake/build-static -j$(nproc)
-    cmake --install build/cmake/build-static
+    cmake --build build/cmake/build-static --parallel "$BUILD_JOBS"
+    cmake --install build/cmake/build-static --parallel "$BUILD_JOBS"
     cd ..
 }
 
@@ -328,8 +384,8 @@ build_openjpeg() {
         -DBUILD_SHARED_LIBS=OFF \
         -DBUILD_CODEC=OFF \
         -DBUILD_JPIP=OFF
-    cmake --build build -j$(nproc)
-    cmake --install build
+    cmake --build build --parallel "$BUILD_JOBS"
+    cmake --install build --parallel "$BUILD_JOBS"
     cd ..
 }
 
@@ -365,9 +421,10 @@ build_lcms2() {
     ./configure --prefix="$PREFIX" \
                 --disable-shared \
                 --enable-static \
-                --disable-examples
-    make -j$(nproc)
-    make install
+                --disable-examples \
+                $(autotools_host_flags)
+    make -j"$BUILD_JOBS"
+    make -j"$BUILD_JOBS" install
     cd ..
 }
 
@@ -392,9 +449,10 @@ build_xz() {
                 --disable-lzmadec \
                 --disable-lzmainfo \
                 --disable-scripts \
-                --disable-doc
-    make -j$(nproc)
-    make install
+                --disable-doc \
+                $(autotools_host_flags)
+    make -j"$BUILD_JOBS"
+    make -j"$BUILD_JOBS" install
     cd ..
 }
 
@@ -416,8 +474,8 @@ build_libxml2() {
         -DLIBXML2_WITH_TESTS=OFF \
         -DLIBXML2_WITH_PROGRAMS=OFF \
         -DCMAKE_PREFIX_PATH="$PREFIX"
-    cmake --build build -j$(nproc)
-    cmake --install build
+    cmake --build build --parallel "$BUILD_JOBS"
+    cmake --install build --parallel "$BUILD_JOBS"
     cd ..
 }
 
@@ -432,6 +490,8 @@ build_libzip() {
     cmake -S . -B build \
         -DCMAKE_INSTALL_PREFIX="$PREFIX" \
         -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_PREFIX_PATH="$PREFIX" \
+        -DCMAKE_FIND_ROOT_PATH="$PREFIX" \
         -DBUILD_SHARED_LIBS=OFF \
         -DENABLE_GNUTLS=OFF \
         -DENABLE_MBEDTLS=OFF \
@@ -439,9 +499,14 @@ build_libzip() {
         -DENABLE_COMMONCRYPTO=OFF \
         -DBUILD_TOOLS=OFF \
         -DBUILD_REGRESS=OFF \
-        -DBUILD_EXAMPLES=OFF
-    cmake --build build -j$(nproc)
-    cmake --install build
+        -DBUILD_EXAMPLES=OFF \
+        -DBUILD_OSSFUZZ=OFF \
+        -DBUILD_DOC=OFF \
+        -DZLIB_ROOT="$PREFIX" \
+        -DZLIB_LIBRARY="$PREFIX/lib/libz.a" \
+        -DZLIB_INCLUDE_DIR="$PREFIX/include"
+    cmake --build build --parallel "$BUILD_JOBS"
+    cmake --install build --parallel "$BUILD_JOBS"
     cd ..
 }
 
@@ -469,8 +534,8 @@ build_pcre2() {
         -DPCRE2_SUPPORT_LIBZ=OFF \
         -DPCRE2_SUPPORT_LIBREADLINE=OFF \
         -DPCRE2_SUPPORT_LIBEDIT=OFF
-    cmake --build build -j$(nproc)
-    cmake --install build
+    cmake --build build --parallel "$BUILD_JOBS"
+    cmake --install build --parallel "$BUILD_JOBS"
     cd ..
 }
 
@@ -493,9 +558,10 @@ build_libffi() {
                 --disable-shared \
                 --enable-static \
                 --disable-docs \
-                --disable-multi-os-directory
-    make -j$(nproc)
-    make install
+                --disable-multi-os-directory \
+                $(autotools_host_flags)
+    make -j"$BUILD_JOBS"
+    make -j"$BUILD_JOBS" install
     cd ..
 }
 
@@ -510,7 +576,7 @@ build_glib() {
     mkdir -p subprojects
     checkout_repo_ref "subprojects/gvdb" "$GVDB_REPO" "$GVDB_REF"
 
-    "$MESON_BIN" setup build \
+    local meson_cmd=(setup build \
         --prefix="$PREFIX" \
         --libdir=lib \
         --default-library=static \
@@ -532,9 +598,13 @@ build_glib() {
         -Dglib_debug=disabled \
         -Dglib_assert=false \
         -Dglib_checks=false \
-        -Doss_fuzz=disabled
-    ninja -C build
-    ninja -C build install
+        -Doss_fuzz=disabled)
+    if [ -n "$MESON_CROSS_FILE" ]; then
+        meson_cmd+=(--cross-file "$MESON_CROSS_FILE")
+    fi
+    "$MESON_BIN" "${meson_cmd[@]}"
+    ninja -C build -j"$BUILD_JOBS"
+    ninja -C build -j"$BUILD_JOBS" install
     cd ..
 }
 
@@ -552,9 +622,10 @@ build_liblqr() {
 
     ./configure --prefix="$PREFIX" \
                 --disable-shared \
-                --enable-static
-    make -j$(nproc)
-    make install
+                --enable-static \
+                $(autotools_host_flags)
+    make -j"$BUILD_JOBS"
+    make -j"$BUILD_JOBS" install
     cd ..
 }
 
@@ -566,16 +637,20 @@ build_fribidi() {
 
     cd fribidi
     rm -rf build
-    "$MESON_BIN" setup build \
+    local meson_cmd=(setup build \
         --prefix="$PREFIX" \
         --libdir=lib \
         --default-library=static \
         --buildtype=release \
         -Ddocs=false \
         -Dtests=false \
-        -Dbin=false
-    ninja -C build
-    ninja -C build install
+        -Dbin=false)
+    if [ -n "$MESON_CROSS_FILE" ]; then
+        meson_cmd+=(--cross-file "$MESON_CROSS_FILE")
+    fi
+    "$MESON_BIN" "${meson_cmd[@]}"
+    ninja -C build -j"$BUILD_JOBS"
+    ninja -C build -j"$BUILD_JOBS" install
     cd ..
 }
 
@@ -587,13 +662,17 @@ build_libraqm() {
 
     cd libraqm
     rm -rf build
-    "$MESON_BIN" setup build \
+    local meson_cmd=(setup build \
         --prefix="$PREFIX" \
         --libdir=lib \
         --default-library=static \
-        --buildtype=release
-    ninja -C build
-    ninja -C build install
+        --buildtype=release)
+    if [ -n "$MESON_CROSS_FILE" ]; then
+        meson_cmd+=(--cross-file "$MESON_CROSS_FILE")
+    fi
+    "$MESON_BIN" "${meson_cmd[@]}"
+    ninja -C build -j"$BUILD_JOBS"
+    ninja -C build -j"$BUILD_JOBS" install
     cd ..
 }
 
@@ -610,8 +689,8 @@ build_imath() {
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_SHARED_LIBS=OFF \
         -DBUILD_TESTING=OFF
-    cmake --build build -j$(nproc)
-    cmake --install build
+    cmake --build build --parallel "$BUILD_JOBS"
+    cmake --install build --parallel "$BUILD_JOBS"
     cd ..
 }
 
@@ -631,8 +710,8 @@ build_openexr() {
         -DOPENEXR_BUILD_TOOLS=OFF \
         -DOPENEXR_BUILD_EXAMPLES=OFF \
         -DCMAKE_PREFIX_PATH="$PREFIX"
-    cmake --build build -j$(nproc)
-    cmake --install build
+    cmake --build build --parallel "$BUILD_JOBS"
+    cmake --install build --parallel "$BUILD_JOBS"
     cd ..
 }
 
@@ -649,8 +728,8 @@ build_libde265() {
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_SHARED_LIBS=OFF \
         -DENABLE_ENCODER=OFF
-    cmake --build build -j$(nproc)
-    cmake --install build
+    cmake --build build --parallel "$BUILD_JOBS"
+    cmake --install build --parallel "$BUILD_JOBS"
     cd ..
 }
 
@@ -680,8 +759,8 @@ build_libheif() {
         -DWITH_GDK_PIXBUF=OFF \
         -DWITH_REDUCED_VISIBILITY=ON \
         -DCMAKE_PREFIX_PATH="$PREFIX"
-    cmake --build build -j$(nproc)
-    cmake --install build
+    cmake --build build --parallel "$BUILD_JOBS"
+    cmake --install build --parallel "$BUILD_JOBS"
     cd ..
 }
 
@@ -712,9 +791,10 @@ build_libraw() {
                 --disable-shared \
                 --enable-static \
                 --enable-examples=no \
-                --enable-openmp=no
-    make -j$(nproc)
-    make install
+                --enable-openmp=no \
+                $(autotools_host_flags)
+    make -j"$BUILD_JOBS"
+    make -j"$BUILD_JOBS" install
     cd ..
 }
 
@@ -752,9 +832,10 @@ build_freetype() {
                 --disable-shared \
                 --enable-static \
                 "$harfbuzz_flag" \
-                --with-zlib-prefix="$PREFIX"
-    make -j$(nproc)
-    make install
+                --with-zlib-prefix="$PREFIX" \
+                $(autotools_host_flags)
+    make -j"$BUILD_JOBS"
+    make -j"$BUILD_JOBS" install
     
     cd ..
 }
@@ -768,7 +849,7 @@ build_harfbuzz() {
     cd harfbuzz
 
     rm -rf build
-    "$MESON_BIN" setup build \
+    local meson_cmd=(setup build \
         --prefix="$PREFIX" \
         --libdir=lib \
         --default-library=static \
@@ -781,9 +862,13 @@ build_harfbuzz() {
         -Dcairo=disabled \
         -Dicu=disabled \
         -Dgraphite=disabled \
-        -Dfreetype=enabled
-    ninja -C build
-    ninja -C build install
+        -Dfreetype=enabled)
+    if [ -n "$MESON_CROSS_FILE" ]; then
+        meson_cmd+=(--cross-file "$MESON_CROSS_FILE")
+    fi
+    "$MESON_BIN" "${meson_cmd[@]}"
+    ninja -C build -j"$BUILD_JOBS"
+    ninja -C build -j"$BUILD_JOBS" install
 
     cd ..
 }
@@ -804,9 +889,10 @@ build_webp() {
     
     ./configure --prefix="$PREFIX" \
                 --disable-shared \
-                --enable-static
-    make -j$(nproc)
-    make install
+                --enable-static \
+                $(autotools_host_flags)
+    make -j"$BUILD_JOBS"
+    make -j"$BUILD_JOBS" install
     cd ..
 }
 
@@ -832,9 +918,10 @@ build_tiff() {
                 --with-libdeflate-include-dir="$PREFIX/include" \
                 --with-libdeflate-lib-dir="$PREFIX/lib" \
                 --with-jpeg-include-dir="$PREFIX/include" \
-                --with-jpeg-lib-dir="$PREFIX/lib"
-    make -j$(nproc)
-    make install
+                --with-jpeg-lib-dir="$PREFIX/lib" \
+                $(autotools_host_flags)
+    make -j"$BUILD_JOBS"
+    make -j"$BUILD_JOBS" install
     cd ..
 }
 
@@ -845,20 +932,50 @@ build_fontconfig() {
     checkout_repo_tag "fontconfig" "$FONTCONFIG_REPO" "$FONTCONFIG_TAG"
 
     cd fontconfig
-    
+
     # Generate configure script if it doesn't exist
     if [ ! -f "configure" ]; then
         log_info "Generating fontconfig configure script..."
         ./autogen.sh
     fi
-    
-    ./configure --prefix="$PREFIX" \
-                --disable-shared \
-                --enable-static \
-                --with-freetype-config="$PREFIX/bin/freetype-config" \
-                --disable-docs
-    make -j$(nproc)
-    make install
+
+    local libxml_pkg_path="$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig:$PREFIX/share/pkgconfig"
+    local libxml_pkg_libdir="$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig:$PREFIX/share/pkgconfig"
+    export PKG_CONFIG_PATH="$libxml_pkg_path${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+    export PKG_CONFIG_LIBDIR="$libxml_pkg_libdir${PKG_CONFIG_LIBDIR:+:$PKG_CONFIG_LIBDIR}"
+
+    local fc_configure_args=(
+        --prefix="$PREFIX"
+        --disable-shared
+        --enable-static
+        --enable-libxml2
+        --with-freetype-config="$PREFIX/bin/freetype-config"
+        --disable-docs
+    )
+
+    if ! PKG_CONFIG_PATH="$libxml_pkg_path${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" \
+         PKG_CONFIG_LIBDIR="$libxml_pkg_libdir${PKG_CONFIG_LIBDIR:+:$PKG_CONFIG_LIBDIR}" \
+         pkg-config --exists libxml-2.0; then
+        log_error "Local libxml2 pkg-config metadata was not found in $PREFIX; cannot build fontconfig with libxml2"
+        exit 1
+    fi
+
+    local libxml_cflags
+    local libxml_libs
+    libxml_cflags="$(PKG_CONFIG_PATH="$libxml_pkg_path${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" \
+        PKG_CONFIG_LIBDIR="$libxml_pkg_libdir${PKG_CONFIG_LIBDIR:+:$PKG_CONFIG_LIBDIR}" \
+        pkg-config --cflags libxml-2.0)"
+    libxml_libs="$(PKG_CONFIG_PATH="$libxml_pkg_path${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" \
+        PKG_CONFIG_LIBDIR="$libxml_pkg_libdir${PKG_CONFIG_LIBDIR:+:$PKG_CONFIG_LIBDIR}" \
+        pkg-config --libs libxml-2.0)"
+
+    PKG_CONFIG_PATH="$libxml_pkg_path${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" \
+    PKG_CONFIG_LIBDIR="$libxml_pkg_libdir${PKG_CONFIG_LIBDIR:+:$PKG_CONFIG_LIBDIR}" \
+    LIBXML2_CFLAGS="$libxml_cflags" \
+    LIBXML2_LIBS="$libxml_libs" \
+    ./configure "${fc_configure_args[@]}" $(autotools_host_flags)
+    make -j"$BUILD_JOBS"
+    make -j"$BUILD_JOBS" install
     cd ..
 }
 
@@ -1020,11 +1137,11 @@ build_imagemagick() {
 
     ./configure "${configure_args[@]}"
     
-    log_info "Compiling ImageMagick with full static linking (using $(nproc) cores)..."
-    make -j$(nproc) LDFLAGS="-all-static -L$PREFIX/lib -L$PREFIX/lib64"
+    log_info "Compiling ImageMagick with full static linking (using $BUILD_JOBS cores)..."
+    make -j"$BUILD_JOBS" LDFLAGS="-all-static -L$PREFIX/lib -L$PREFIX/lib64"
     
     log_info "Installing..."
-    make install
+    make -j"$BUILD_JOBS" install
 
     # Keep only runtime utilities in this build output.
     find "$PREFIX/imagemagick/bin" -maxdepth 1 -type f -name '*-config' -delete 2>/dev/null || true
@@ -1096,11 +1213,16 @@ create_portable_tarball() {
     
     mkdir -p "$temp_dir/imagemagick-${tag}-${arch}/bin"
     
-    # Copy available core utilities only
+    # Copy available core utilities only, preserving symlinks to avoid bloating
+    # the portable tarball with multiple copies of the same magick binary.
     for util in "${core_utils[@]}"; do
-        if [ -f "$bin_dir/$util" ]; then
-            cp "$bin_dir/$util" "$temp_dir/imagemagick-${tag}-${arch}/bin/"
-            log_info "Included: $util"
+        if [ -e "$bin_dir/$util" ]; then
+            cp -a "$bin_dir/$util" "$temp_dir/imagemagick-${tag}-${arch}/bin/"
+            if [ -L "$bin_dir/$util" ]; then
+                log_info "Included symlink: $util -> $(readlink "$bin_dir/$util")"
+            else
+                log_info "Included: $util"
+            fi
         fi
     done
     
@@ -1247,6 +1369,9 @@ No external dependencies, no .so files, no bindings, completely portable.
 
 Usage: ./build.sh [OPTIONS]
 
+Environment:
+    SKIP_APT_INSTALL=true   Skip the apt-get dependency step for local iterative builds
+
 Options:
     TAG         Release tag to build (default: latest)
                 Example: 7.1.2-27
@@ -1266,6 +1391,9 @@ Examples:
 
     # Build specific version for armv7/armhf
     ./build.sh 7.1.2-27 armv7
+
+    # Iterate locally without re-running apt-get every time
+    SKIP_APT_INSTALL=true ./build.sh 7.1.2-30 armv7
 
 Output:
     - Portable tarball: build/imagemagick-<tag>-linux-<arch>.tar.gz
@@ -1347,6 +1475,8 @@ main() {
     log_info "FULL_DELEGATES: $FULL_DELEGATES"
 
     load_dependency_lock
+    mkdir -p "$WORK_DIR"
+    mkdir -p "$BUILD_DIR"
     
     # Validate architecture
     case $TARGET_ARCH in
@@ -1366,6 +1496,27 @@ main() {
             ;;
     esac
 
+    if [ "$TARGET_ARCH" = "armv7" ]; then
+        local target_triplet="arm-linux-gnueabihf"
+        local qemu_sysroot="/usr/arm-linux-gnueabihf"
+        TARGET_TRIPLET="$target_triplet"
+        export CC="${CC:-${target_triplet}-gcc}"
+        export CXX="${CXX:-${target_triplet}-g++}"
+        export AR="${AR:-${target_triplet}-ar}"
+        export RANLIB="${RANLIB:-${target_triplet}-ranlib}"
+        export STRIP="${STRIP:-${target_triplet}-strip}"
+        export QEMU_LD_PREFIX="$qemu_sysroot"
+        export QEMU_SET_ENV="LD_LIBRARY_PATH=/usr/arm-linux-gnueabihf/lib:/usr/arm-linux-gnueabihf/lib/arm-linux-gnueabihf"
+        log_info "Using armv7 cross-toolchain: CC=${CC} CXX=${CXX} AR=${AR} RANLIB=${RANLIB}"
+        log_info "QEMU_LD_PREFIX=${QEMU_LD_PREFIX}"
+        write_meson_cross_file
+    else
+        TARGET_TRIPLET=""
+        MESON_CROSS_FILE=""
+        unset QEMU_LD_PREFIX QEMU_SET_ENV
+        export MESON_CROSS_FILE
+    fi
+
     # Use baseline CPU targets for portable binaries.
     local arch_cflags
     case $TARGET_ARCH in
@@ -1381,7 +1532,12 @@ main() {
             arch_cflags="-march=armv8-a"
             ;;
         armv7)
-            arch_cflags="-march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard"
+            arch_cflags="-march=armv7-a"
+            if compiler_supports_armv7_fpu_flags; then
+                arch_cflags="$arch_cflags -mfpu=vfpv3-d16 -mfloat-abi=hard"
+            else
+                log_warn "armv7 cross-compiler does not support the required hard-float pair (-mfpu=vfpv3-d16 -mfloat-abi=hard); using generic armv7 baseline without it"
+            fi
             ;;
     esac
 
@@ -1402,16 +1558,6 @@ main() {
         exit 1
     fi
 
-    if [ "$TARGET_ARCH" = "armv7" ]; then
-        local target_triplet="arm-linux-gnueabihf"
-        export CC="${CC:-${target_triplet}-gcc}"
-        export CXX="${CXX:-${target_triplet}-g++}"
-        export AR="${AR:-${target_triplet}-ar}"
-        export RANLIB="${RANLIB:-${target_triplet}-ranlib}"
-        export STRIP="${STRIP:-${target_triplet}-strip}"
-        log_info "Using armv7 cross-toolchain: CC=${CC} CXX=${CXX} AR=${AR} RANLIB=${RANLIB}"
-    fi
-    
     # Create work directory
     mkdir -p "$WORK_DIR"
     mkdir -p "$BUILD_DIR"
