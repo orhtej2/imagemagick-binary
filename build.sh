@@ -385,7 +385,7 @@ build_openjpeg() {
         -DBUILD_CODEC=OFF \
         -DBUILD_JPIP=OFF
     cmake --build build --parallel "$BUILD_JOBS"
-    cmake --install buil
+    cmake --install build
     cd ..
 }
 
@@ -938,6 +938,14 @@ build_fontconfig() {
         log_info "Generating fontconfig configure script..."
         ./autogen.sh
     fi
+
+    # Fontconfig caches the expat/libxml2 probe in config.cache/config.status.
+    # If this source tree is reused after an earlier failed configure, that stale
+    # result can overshadow the intended --enable-libxml2 path even when the
+    # local libxml2 pkg-config metadata is present.
+    make distclean >/dev/null 2>&1 || true
+    rm -f config.cache config.log config.status
+    rm -rf autom4te.cache
 
     local libxml_pkg_path="$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig:$PREFIX/share/pkgconfig"
     local libxml_pkg_libdir="$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig:$PREFIX/share/pkgconfig"
