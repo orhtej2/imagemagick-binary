@@ -43,23 +43,60 @@ jobs:
         run: |
           set -euxo pipefail
 
+          RELEASE_TAG=""
           if [ -n "$MANUAL_TAG" ]; then
             RELEASE_TAG="$MANUAL_TAG"
             echo "Using manually specified release: $RELEASE_TAG"
           else
-            RELEASE_TAG="$(gh api repos/ImageMagick/ImageMagick/releases/latest --jq '.tag_name')"
+            for attempt in 1 2 3; do
+              if RELEASE_TAG="$(gh api repos/ImageMagick/ImageMagick/releases/latest --jq '.tag_name' 2>/tmp/gh_latest_release.err || true)" && [ -n "$RELEASE_TAG" ] && [ "$RELEASE_TAG" != "null" ]; then
+                break
+              fi
+              echo "Failed to resolve latest ImageMagick release on attempt $attempt; retrying..."
+              if [ "$attempt" -eq 3 ]; then
+                echo "Unable to determine latest upstream ImageMagick tag after 3 attempts"
+                echo "should_build=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              sleep 5
+            done
           fi
 
-          test -n "$RELEASE_TAG"
+          if [ -z "$RELEASE_TAG" ] || [ "$RELEASE_TAG" = "null" ]; then
+            echo "Invalid release tag resolved: ${RELEASE_TAG:-<empty>}"
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+            echo "Bailing out: upstream release tag could not be determined reliably"
+            exit 0
+          fi
+
           echo "Latest ImageMagick release: $RELEASE_TAG"
           echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
           if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
             echo "Tag $RELEASE_TAG already exists in this repo"
             if [ "$FORCE_BUILD" != "true" ]; then
-              echo "should_build=false" >> "$GITHUB_OUTPUT"
-              echo "Skipping build because the release tag already exists"
-              exit 0
+              for asset_attempt in 1 2 3; do
+                if gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' >/tmp/release-assets.txt 2>/tmp/gh_release_assets.err; then
+                  ARMV7_ASSET="imagemagick-${RELEASE_TAG}-linux-armv7.tar.gz"
+                  if grep -Fxq "$ARMV7_ASSET" /tmp/release-assets.txt; then
+                    echo "armv7 asset already exists in release $RELEASE_TAG"
+                    echo "should_build=false" >> "$GITHUB_OUTPUT"
+                    echo "Skipping build because the release tag and armv7 artifact already exist"
+                    exit 0
+                  fi
+                  echo "armv7 asset missing from existing release $RELEASE_TAG; rebuilding it"
+                  break
+                fi
+
+                echo "Failed to fetch release assets for $RELEASE_TAG on attempt $asset_attempt; retrying..."
+                if [ "$asset_attempt" -eq 3 ]; then
+                  echo "Unable to confirm release asset state for $RELEASE_TAG after 3 attempts; bailing out to avoid invalid state"
+                  echo "should_build=false" >> "$GITHUB_OUTPUT"
+                  echo "Bailing out: release metadata is ambiguous or invalid; manual intervention required"
+                  exit 0
+                fi
+                sleep 5
+              done
             fi
           fi
 
