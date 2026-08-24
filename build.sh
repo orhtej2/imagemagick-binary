@@ -288,7 +288,7 @@ build_libdeflate() {
         -DLIBDEFLATE_BUILD_TESTS=OFF \
         -DLIBDEFLATE_INSTALL=ON
     cmake --build build --parallel "$BUILD_JOBS"
-    cmake --install build --parallel "$BUILD_JOBS"
+    cmake --install build
     cd ..
 }
 
@@ -366,7 +366,7 @@ build_zstd() {
         -DZSTD_BUILD_SHARED=OFF \
         -DZSTD_BUILD_STATIC=ON
     cmake --build build/cmake/build-static --parallel "$BUILD_JOBS"
-    cmake --install build/cmake/build-static --parallel "$BUILD_JOBS"
+    cmake --install build/cmake/build-static
     cd ..
 }
 
@@ -385,7 +385,7 @@ build_openjpeg() {
         -DBUILD_CODEC=OFF \
         -DBUILD_JPIP=OFF
     cmake --build build --parallel "$BUILD_JOBS"
-    cmake --install build --parallel "$BUILD_JOBS"
+    cmake --install buil
     cd ..
 }
 
@@ -475,7 +475,7 @@ build_libxml2() {
         -DLIBXML2_WITH_PROGRAMS=OFF \
         -DCMAKE_PREFIX_PATH="$PREFIX"
     cmake --build build --parallel "$BUILD_JOBS"
-    cmake --install build --parallel "$BUILD_JOBS"
+    cmake --install build
     cd ..
 }
 
@@ -506,7 +506,7 @@ build_libzip() {
         -DZLIB_LIBRARY="$PREFIX/lib/libz.a" \
         -DZLIB_INCLUDE_DIR="$PREFIX/include"
     cmake --build build --parallel "$BUILD_JOBS"
-    cmake --install build --parallel "$BUILD_JOBS"
+    cmake --install build
     cd ..
 }
 
@@ -535,7 +535,7 @@ build_pcre2() {
         -DPCRE2_SUPPORT_LIBREADLINE=OFF \
         -DPCRE2_SUPPORT_LIBEDIT=OFF
     cmake --build build --parallel "$BUILD_JOBS"
-    cmake --install build --parallel "$BUILD_JOBS"
+    cmake --install build
     cd ..
 }
 
@@ -690,7 +690,7 @@ build_imath() {
         -DBUILD_SHARED_LIBS=OFF \
         -DBUILD_TESTING=OFF
     cmake --build build --parallel "$BUILD_JOBS"
-    cmake --install build --parallel "$BUILD_JOBS"
+    cmake --install build
     cd ..
 }
 
@@ -711,7 +711,7 @@ build_openexr() {
         -DOPENEXR_BUILD_EXAMPLES=OFF \
         -DCMAKE_PREFIX_PATH="$PREFIX"
     cmake --build build --parallel "$BUILD_JOBS"
-    cmake --install build --parallel "$BUILD_JOBS"
+    cmake --install build
     cd ..
 }
 
@@ -729,7 +729,7 @@ build_libde265() {
         -DBUILD_SHARED_LIBS=OFF \
         -DENABLE_ENCODER=OFF
     cmake --build build --parallel "$BUILD_JOBS"
-    cmake --install build --parallel "$BUILD_JOBS"
+    cmake --install build
     cd ..
 }
 
@@ -760,7 +760,7 @@ build_libheif() {
         -DWITH_REDUCED_VISIBILITY=ON \
         -DCMAKE_PREFIX_PATH="$PREFIX"
     cmake --build build --parallel "$BUILD_JOBS"
-    cmake --install build --parallel "$BUILD_JOBS"
+    cmake --install build
     cd ..
 }
 
