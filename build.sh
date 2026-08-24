@@ -741,24 +741,41 @@ build_libheif() {
 
     cd libheif
     rm -rf build
-    cmake -S . -B build \
-        -DCMAKE_INSTALL_PREFIX="$PREFIX" \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DBUILD_SHARED_LIBS=OFF \
-        -DBUILD_TESTING=OFF \
-        -DWITH_LIBDE265=ON \
-        -DWITH_X265=OFF \
-        -DWITH_AOM=OFF \
-        -DWITH_DAV1D=OFF \
-        -DWITH_RAV1E=OFF \
-        -DWITH_SvtEnc=OFF \
-        -DWITH_OpenH264=OFF \
-        -DWITH_JPEG_DECODER=OFF \
-        -DWITH_JPEG_ENCODER=OFF \
-        -DWITH_EXAMPLES=OFF \
-        -DWITH_GDK_PIXBUF=OFF \
-        -DWITH_REDUCED_VISIBILITY=ON \
-        -DCMAKE_PREFIX_PATH="$PREFIX"
+    local cmake_cmd=(cmake -S . -B build
+        -DCMAKE_INSTALL_PREFIX="$PREFIX"
+        -DCMAKE_BUILD_TYPE=Release
+        -DBUILD_SHARED_LIBS=OFF
+        -DBUILD_TESTING=OFF
+        -DWITH_LIBDE265=ON
+        -DWITH_X265=OFF
+        -DWITH_AOM=OFF
+        -DWITH_DAV1D=OFF
+        -DWITH_RAV1E=OFF
+        -DWITH_SvtEnc=OFF
+        -DWITH_OpenH264=OFF
+        -DWITH_JPEG_DECODER=OFF
+        -DWITH_JPEG_ENCODER=OFF
+        -DWITH_EXAMPLES=OFF
+        -DWITH_GDK_PIXBUF=OFF
+        -DWITH_REDUCED_VISIBILITY=ON
+        -DCMAKE_PREFIX_PATH="$PREFIX")
+    if [ -n "${TARGET_TRIPLET:-}" ]; then
+        # libtiff/libwebp are built after libheif in this script, so their
+        # find_package() calls would otherwise fall back to the host's system
+        # include/lib paths (e.g. preinstalled -dev packages on CI runners),
+        # leaking amd64 headers into the arm cross-compile.
+        cmake_cmd+=(
+            -DCMAKE_SYSTEM_NAME=Linux
+            -DCMAKE_FIND_ROOT_PATH="$PREFIX"
+            -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
+            -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
+            -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
+            -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
+            -DCMAKE_DISABLE_FIND_PACKAGE_TIFF=ON
+            -DCMAKE_DISABLE_FIND_PACKAGE_WEBP=ON
+        )
+    fi
+    "${cmake_cmd[@]}"
     cmake --build build --parallel "$BUILD_JOBS"
     cmake --install build
     cd ..
