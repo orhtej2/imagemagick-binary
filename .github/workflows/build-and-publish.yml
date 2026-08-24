@@ -202,16 +202,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install armv7 cross-toolchain
+      - name: Install a clean armv7 cross-toolchain on Ubuntu 22.04
         run: |
           set -euxo pipefail
           sudo apt-get update
-          sudo apt-get install -y \
+          sudo apt-get install --reinstall --no-install-recommends -y \
             gcc-arm-linux-gnueabihf \
             g++-arm-linux-gnueabihf \
             libc6-dev-armhf-cross \
+            binutils-arm-linux-gnueabihf \
             qemu-user-static \
             libc6-dev-i386
+
+          arm-linux-gnueabihf-gcc --version
+          arm-linux-gnueabihf-g++ --version
+          dpkg -l | egrep 'gcc-arm-linux-gnueabihf|g\+\+-arm-linux-gnueabihf|libc6-dev-armhf-cross'
+          printf '#include <cstdlib>\nint main() { return 0; }\n' | \
+            arm-linux-gnueabihf-g++ -std=gnu++17 -x c++ -c -o /tmp/cross-stdlib-check.o -
 
       - name: Build ImageMagick for armv7
         env:
