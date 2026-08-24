@@ -933,19 +933,7 @@ build_fontconfig() {
 
     cd fontconfig
 
-    # Generate configure script if it doesn't exist
-    if [ ! -f "configure" ]; then
-        log_info "Generating fontconfig configure script..."
-        ./autogen.sh
-    fi
-
-    # Fontconfig caches the expat/libxml2 probe in config.cache/config.status.
-    # If this source tree is reused after an earlier failed configure, that stale
-    # result can overshadow the intended --enable-libxml2 path even when the
-    # local libxml2 pkg-config metadata is present.
-    make distclean >/dev/null 2>&1 || true
-    rm -f config.cache config.log config.status
-    rm -rf autom4te.cache
+    git clean -xdff
 
     local libxml_pkg_path="$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig:$PREFIX/share/pkgconfig"
     local libxml_pkg_libdir="$PREFIX/lib/pkgconfig:$PREFIX/lib64/pkgconfig:$PREFIX/share/pkgconfig"
@@ -981,7 +969,13 @@ build_fontconfig() {
     PKG_CONFIG_LIBDIR="$libxml_pkg_libdir${PKG_CONFIG_LIBDIR:+:$PKG_CONFIG_LIBDIR}" \
     LIBXML2_CFLAGS="$libxml_cflags" \
     LIBXML2_LIBS="$libxml_libs" \
-    ./configure "${fc_configure_args[@]}" $(autotools_host_flags)
+    # Generate configure script if it doesn't exist
+    if [ ! -f "configure" ]; then
+        log_info "Generating fontconfig configure script..."
+        ./autogen.sh "${fc_configure_args[@]}" $(autotools_host_flags)
+    else
+        ./configure
+    fi
     make -j"$BUILD_JOBS"
     make -j"$BUILD_JOBS" install
     cd ..
