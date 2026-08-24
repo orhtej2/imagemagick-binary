@@ -210,7 +210,9 @@ jobs:
             gcc-arm-linux-gnueabihf \
             g++-arm-linux-gnueabihf \
             libc6-dev-armhf-cross \
-            qemu-user-static
+            qemu-user-static \
+            libc6-dev-i386 \
+            g++-multilib
 
       - name: Build ImageMagick for armv7
         env:
