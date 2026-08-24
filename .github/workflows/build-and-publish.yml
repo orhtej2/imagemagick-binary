@@ -225,8 +225,26 @@ jobs:
           FULL_DELEGATES: ${{ github.event.inputs.full_delegates || 'true' }}
         run: |
           set -euxo pipefail
+          echo "CC=${CC:-arm-linux-gnueabihf-gcc}"
+          echo "CXX=${CXX:-arm-linux-gnueabihf-g++}"
+          echo "CPPFLAGS=${CPPFLAGS:-}"
+          echo "CFLAGS=${CFLAGS:-}"
+          echo "CXXFLAGS=${CXXFLAGS:-}"
+          ${CC:-arm-linux-gnueabihf-gcc} -dM -E -x c /dev/null | grep __HAVE_FLOAT128 || true
+          printf '#include <cstdlib>\nint main(){return 0;}\n' | ${CXX:-arm-linux-gnueabihf-g++} -std=gnu++17 -x c++ -c -o /tmp/ci-ok.o -
+
           chmod +x ./build.sh
-          ./build.sh "${{ needs.check-and-build.outputs.release_tag }}" armv7
+          
+          ./build.sh "${{ needs.check-and-build.outputs.release_tag }}" armv7 || 1
+
+          echo "CC=${CC:-arm-linux-gnueabihf-gcc}"
+          echo "CXX=${CXX:-arm-linux-gnueabihf-g++}"
+          echo "CPPFLAGS=${CPPFLAGS:-}"
+          echo "CFLAGS=${CFLAGS:-}"
+          echo "CXXFLAGS=${CXXFLAGS:-}"
+          ${CC:-arm-linux-gnueabihf-gcc} -dM -E -x c /dev/null | grep __HAVE_FLOAT128 || true
+          printf '#include <cstdlib>\nint main(){return 0;}\n' | ${CXX:-arm-linux-gnueabihf-g++} -std=gnu++17 -x c++ -c -o /tmp/ci-ok.o -
+
 
       - name: Validate armv7 artifact
         run: |
