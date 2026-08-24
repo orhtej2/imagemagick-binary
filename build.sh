@@ -8,6 +8,7 @@ set -e
 # Examples:
 #   ./build.sh 7.1.2-27 amd64      # Build specific tag for amd64
 #   ./build.sh 7.1.2-27 arm64      # Build specific tag for arm64
+#   ./build.sh 7.1.2-27 armv7      # Build specific tag for armv7/armhf
 #   ./build.sh                      # Build latest for current architecture
 
 # Configuration
@@ -1251,7 +1252,7 @@ Options:
                 Example: 7.1.2-27
     
     ARCH        Target architecture (default: current system architecture)
-                Options: amd64, arm64
+                Options: amd64, arm64, armv7 (armhf)
 
 Examples:
     # Build latest for current architecture
@@ -1262,6 +1263,9 @@ Examples:
 
     # Build specific version for arm64
     ./build.sh 7.1.2-27 arm64
+
+    # Build specific version for armv7/armhf
+    ./build.sh 7.1.2-27 armv7
 
 Output:
     - Portable tarball: build/imagemagick-<tag>-linux-<arch>.tar.gz
@@ -1352,9 +1356,12 @@ main() {
         arm64|aarch64)
             TARGET_ARCH="arm64"
             ;;
+        armv7|armhf|armv7l)
+            TARGET_ARCH="armv7"
+            ;;
         *)
             log_error "Unsupported architecture: $TARGET_ARCH"
-            log_warn "Supported architectures: amd64, arm64"
+            log_warn "Supported architectures: amd64, arm64, armv7 (armhf)"
             exit 1
             ;;
     esac
@@ -1373,6 +1380,9 @@ main() {
         arm64)
             arch_cflags="-march=armv8-a"
             ;;
+        armv7)
+            arch_cflags="-march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard"
+            ;;
     esac
 
     export CFLAGS="-O2 $arch_cflags"
@@ -1390,6 +1400,16 @@ main() {
         log_error "Cross-compilation for amd64 on arm64 is not supported for static builds"
         log_warn "Please run this script natively on amd64 hardware"
         exit 1
+    fi
+
+    if [ "$TARGET_ARCH" = "armv7" ]; then
+        local target_triplet="arm-linux-gnueabihf"
+        export CC="${CC:-${target_triplet}-gcc}"
+        export CXX="${CXX:-${target_triplet}-g++}"
+        export AR="${AR:-${target_triplet}-ar}"
+        export RANLIB="${RANLIB:-${target_triplet}-ranlib}"
+        export STRIP="${STRIP:-${target_triplet}-strip}"
+        log_info "Using armv7 cross-toolchain: CC=${CC} CXX=${CXX} AR=${AR} RANLIB=${RANLIB}"
     fi
     
     # Create work directory

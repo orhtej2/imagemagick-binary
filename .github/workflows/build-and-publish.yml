@@ -125,8 +125,48 @@ jobs:
           path: build/imagemagick-${{ needs.check-and-build.outputs.release_tag }}-linux-arm64.tar.gz
           retention-days: 30
 
+  build-armv7:
+    needs: check-and-build
+    if: needs.check-and-build.outputs.should_build == 'true'
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install armv7 cross-toolchain
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-arm-linux-gnueabihf \
+            g++-arm-linux-gnueabihf \
+            libc6-dev-armhf-cross \
+            qemu-user-static
+
+      - name: Build ImageMagick for armv7
+        env:
+          FULL_DELEGATES: ${{ github.event.inputs.full_delegates || 'true' }}
+        run: |
+          set -euxo pipefail
+          chmod +x ./build.sh
+          ./build.sh "${{ needs.check-and-build.outputs.release_tag }}" armv7
+
+      - name: Validate armv7 artifact
+        run: |
+          set -euxo pipefail
+          archive="build/imagemagick-${{ needs.check-and-build.outputs.release_tag }}-linux-armv7.tar.gz"
+          test -f "$archive"
+          ls -lh "$archive"
+
+      - name: Upload armv7 artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: imagemagick-armv7
+          path: build/imagemagick-${{ needs.check-and-build.outputs.release_tag }}-linux-armv7.tar.gz
+          retention-days: 30
+
   publish:
-    needs: [check-and-build, build-amd64, build-arm64]
+    needs: [check-and-build, build-amd64, build-arm64, build-armv7]
     if: needs.check-and-build.outputs.should_build == 'true'
     runs-on: ubuntu-slim
     permissions:
@@ -148,6 +188,12 @@ jobs:
         with:
           name: imagemagick-arm64
           path: /tmp/artifacts/arm64
+
+      - name: Download armv7 artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: imagemagick-armv7
+          path: /tmp/artifacts/armv7
 
       - name: Generate release BOM from dependencies.lock
         run: |
@@ -291,6 +337,7 @@ jobs:
           RELEASE_TAG="${{ needs.check-and-build.outputs.release_tag }}"
           AMD64_ARCHIVE="/tmp/artifacts/amd64/imagemagick-${RELEASE_TAG}-linux-amd64.tar.gz"
           ARM64_ARCHIVE="/tmp/artifacts/arm64/imagemagick-${RELEASE_TAG}-linux-arm64.tar.gz"
+          ARMV7_ARCHIVE="/tmp/artifacts/armv7/imagemagick-${RELEASE_TAG}-linux-armv7.tar.gz"
           BOM_FILE="/tmp/artifacts/imagemagick-${RELEASE_TAG}-dependencies.bom.txt"
           RELEASE_NOTES_FILE="/tmp/artifacts/imagemagick-${RELEASE_TAG}-release-notes.md"
 
@@ -299,6 +346,7 @@ jobs:
             gh release upload "$RELEASE_TAG" \
               "$AMD64_ARCHIVE" \
               "$ARM64_ARCHIVE" \
+              "$ARMV7_ARCHIVE" \
               "$BOM_FILE" \
               --clobber
           else
@@ -308,5 +356,6 @@ jobs:
               --notes-file "$RELEASE_NOTES_FILE" \
               "$AMD64_ARCHIVE" \
               "$ARM64_ARCHIVE" \
+              "$ARMV7_ARCHIVE" \
               "$BOM_FILE"
           fi

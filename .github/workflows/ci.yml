@@ -44,15 +44,43 @@ jobs:
           chmod +x ./build.sh
           ./build.sh latest arm64
 
+  build-armv7:
+    name: build-armv7
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 180
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      FULL_DELEGATES: "false"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install armv7 cross-toolchain
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-arm-linux-gnueabihf \
+            g++-arm-linux-gnueabihf \
+            libc6-dev-armhf-cross \
+            qemu-user-static
+
+      - name: Build ImageMagick for armv7
+        run: |
+          set -euxo pipefail
+          chmod +x ./build.sh
+          ./build.sh latest armv7
+
   required-check:
     name: required-check
     if: always()
     needs:
       - build-amd64
       - build-arm64
+      - build-armv7
     runs-on: ubuntu-22.04
     steps:
-      - name: Verify both builds succeeded
+      - name: Verify architecture builds succeeded
         run: |
           set -euxo pipefail
           if [ "${{ needs.build-amd64.result }}" != "success" ]; then
@@ -65,4 +93,9 @@ jobs:
             exit 1
           fi
 
-          echo "Both architecture builds passed"
+          if [ "${{ needs.build-armv7.result }}" != "success" ]; then
+            echo "armv7 build failed"
+            exit 1
+          fi
+
+          echo "All architecture builds passed"
