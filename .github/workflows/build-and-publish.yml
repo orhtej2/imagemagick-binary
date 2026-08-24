@@ -244,7 +244,11 @@ jobs:
 
   publish:
     needs: [check-and-build, build-amd64, build-arm64, build-armv7]
-    if: needs.check-and-build.outputs.should_build_any == 'true'
+    if: >-
+      always() && needs.check-and-build.outputs.should_build_any == 'true' &&
+      (needs.build-amd64.result == 'success' || needs.build-amd64.result == 'skipped') &&
+      (needs.build-arm64.result == 'success' || needs.build-arm64.result == 'skipped') &&
+      (needs.build-armv7.result == 'success' || needs.build-armv7.result == 'skipped')
     runs-on: ubuntu-slim
     permissions:
       contents: write
@@ -421,21 +425,29 @@ jobs:
           BOM_FILE="/tmp/artifacts/imagemagick-${RELEASE_TAG}-dependencies.bom.txt"
           RELEASE_NOTES_FILE="/tmp/artifacts/imagemagick-${RELEASE_TAG}-release-notes.md"
 
-          UPLOAD_ARGS=("$BOM_FILE")
-          for archive in "$AMD64_ARCHIVE" "$ARM64_ARCHIVE" "$ARMV7_ARCHIVE"; do
-            if [ -f "$archive" ]; then
-              UPLOAD_ARGS+=("$archive")
-            fi
-          done
-
-          if [ "${#UPLOAD_ARGS[@]}" -eq 1 ]; then
-            echo "No built artifacts were downloaded for this release; only the BOM will be emitted."
-          fi
-
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release edit "$RELEASE_TAG" --notes-file "$RELEASE_NOTES_FILE"
-            gh release upload "$RELEASE_TAG" "${UPLOAD_ARGS[@]}" --clobber
+            gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' >/tmp/release-assets.txt
+
+            UPLOAD_ARGS=()
+            for asset in "$BOM_FILE" "$AMD64_ARCHIVE" "$ARM64_ARCHIVE" "$ARMV7_ARCHIVE"; do
+              if [ -f "$asset" ] && ! grep -Fxq "$(basename "$asset")" /tmp/release-assets.txt; then
+                UPLOAD_ARGS+=("$asset")
+              fi
+            done
+
+            if [ "${#UPLOAD_ARGS[@]}" -gt 0 ]; then
+              gh release upload "$RELEASE_TAG" "${UPLOAD_ARGS[@]}"
+            else
+              echo "All release assets are already present; nothing to upload."
+            fi
           else
+            UPLOAD_ARGS=("$BOM_FILE")
+            for archive in "$AMD64_ARCHIVE" "$ARM64_ARCHIVE" "$ARMV7_ARCHIVE"; do
+              if [ -f "$archive" ]; then
+                UPLOAD_ARGS+=("$archive")
+              fi
+            done
+
             gh release create "$RELEASE_TAG" \
               --target "${GITHUB_SHA}" \
               --title "ImageMagick $RELEASE_TAG" \
