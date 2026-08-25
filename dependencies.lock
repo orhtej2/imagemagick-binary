@@ -68,7 +68,7 @@ LIBDE265_REPO="https://github.com/strukturag/libde265.git"
 LIBDE265_TAG="v1.1.1"
 
 LIBHEIF_REPO="https://github.com/strukturag/libheif.git"
-LIBHEIF_TAG="v1.23.1"
+LIBHEIF_TAG="v1.23.2"
 
 LIBRAW_REPO="https://github.com/LibRaw/LibRaw.git"
 LIBRAW_TAG="0.22.2"
