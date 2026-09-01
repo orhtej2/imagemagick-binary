@@ -38,7 +38,7 @@ MESON_REPO="https://github.com/mesonbuild/meson.git"
 MESON_TAG="1.12.0"
 
 PCRE2_REPO="https://github.com/PCRE2Project/pcre2.git"
-PCRE2_TAG="pcre2-10.47"
+PCRE2_TAG="pcre2-10.48"
 
 LIBFFI_REPO="https://github.com/libffi/libffi.git"
 LIBFFI_TAG="v3.8.0"
