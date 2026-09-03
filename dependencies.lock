@@ -65,7 +65,7 @@ OPENEXR_REPO="https://github.com/AcademySoftwareFoundation/openexr.git"
 OPENEXR_TAG="v3.4.15"
 
 LIBDE265_REPO="https://github.com/strukturag/libde265.git"
-LIBDE265_TAG="v1.1.1"
+LIBDE265_TAG="v1.1.2"
 
 LIBHEIF_REPO="https://github.com/strukturag/libheif.git"
 LIBHEIF_TAG="v1.23.3"
