@@ -26,7 +26,7 @@ LCMS2_REPO="https://github.com/mm2/Little-CMS.git"
 LCMS2_TAG="lcms2.19"
 
 XZ_REPO="https://github.com/tukaani-project/xz.git"
-XZ_TAG="v5.8.3"
+XZ_TAG="v5.8.4"
 
 LIBXML2_REPO="https://gitlab.gnome.org/GNOME/libxml2.git"
 LIBXML2_TAG="v2.15.4"
@@ -44,7 +44,7 @@ LIBFFI_REPO="https://github.com/libffi/libffi.git"
 LIBFFI_TAG="v3.8.0"
 
 GLIB_REPO="https://github.com/GNOME/glib.git"
-GLIB_TAG="2.88.3"
+GLIB_TAG="2.90.0"
 
 GVDB_REPO="https://gitlab.gnome.org/GNOME/gvdb.git"
 GVDB_REF="c6f2359cc1d00f16e0a0e2527fa0bc1882b8b5ab"
@@ -65,7 +65,7 @@ OPENEXR_REPO="https://github.com/AcademySoftwareFoundation/openexr.git"
 OPENEXR_TAG="v3.4.15"
 
 LIBDE265_REPO="https://github.com/strukturag/libde265.git"
-LIBDE265_TAG="v1.1.2"
+LIBDE265_TAG="v1.1.3"
 
 LIBHEIF_REPO="https://github.com/strukturag/libheif.git"
 LIBHEIF_TAG="v1.23.4"
