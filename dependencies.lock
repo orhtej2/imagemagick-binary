@@ -11,7 +11,7 @@ LIBJPEG_TURBO_REPO="https://github.com/libjpeg-turbo/libjpeg-turbo.git"
 LIBJPEG_TURBO_TAG="3.2.0"
 
 LIBPNG_REPO="https://github.com/glennrp/libpng.git"
-LIBPNG_TAG="v1.6.58"
+LIBPNG_TAG="v1.6.59"
 
 BZIP2_REPO="https://github.com/libarchive/bzip2.git"
 BZIP2_TAG="bzip2-1.0.8"
