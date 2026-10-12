@@ -74,7 +74,7 @@ LIBRAW_REPO="https://github.com/LibRaw/LibRaw.git"
 LIBRAW_TAG="0.22.2"
 
 FREETYPE_REPO="https://github.com/freetype/freetype.git"
-FREETYPE_TAG="VER-2-14-3"
+FREETYPE_TAG="VER-2-15-0"
 
 HARFBUZZ_REPO="https://github.com/harfbuzz/harfbuzz.git"
 HARFBUZZ_TAG="14.6.0"
