@@ -32,7 +32,7 @@ LIBXML2_REPO="https://gitlab.gnome.org/GNOME/libxml2.git"
 LIBXML2_TAG="v2.15.4"
 
 LIBZIP_REPO="https://github.com/nih-at/libzip.git"
-LIBZIP_TAG="v1.11.4"
+LIBZIP_TAG="v1.12.1"
 
 MESON_REPO="https://github.com/mesonbuild/meson.git"
 MESON_TAG="1.12.1"
