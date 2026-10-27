@@ -8,7 +8,7 @@ LIBDEFLATE_REPO="https://github.com/ebiggers/libdeflate.git"
 LIBDEFLATE_TAG="v1.26"
 
 LIBJPEG_TURBO_REPO="https://github.com/libjpeg-turbo/libjpeg-turbo.git"
-LIBJPEG_TURBO_TAG="3.2.0"
+LIBJPEG_TURBO_TAG="3.2.1"
 
 LIBPNG_REPO="https://github.com/glennrp/libpng.git"
 LIBPNG_TAG="v1.6.59"
