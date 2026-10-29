@@ -53,7 +53,7 @@ LIBLQR_REPO="https://github.com/carlobaldassi/liblqr.git"
 LIBLQR_TAG="v0.4.3"
 
 FRIBIDI_REPO="https://github.com/fribidi/fribidi.git"
-FRIBIDI_TAG="v1.0.17"
+FRIBIDI_TAG="v1.0.18"
 
 LIBRAQM_REPO="https://github.com/HOST-Oman/libraqm.git"
 LIBRAQM_TAG="v0.11.0"
