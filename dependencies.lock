@@ -23,7 +23,7 @@ OPENJPEG_REPO="https://github.com/uclouvain/openjpeg.git"
 OPENJPEG_TAG="v2.5.4"
 
 LCMS2_REPO="https://github.com/mm2/Little-CMS.git"
-LCMS2_TAG="lcms2.19"
+LCMS2_TAG="lcms2.20"
 
 XZ_REPO="https://github.com/tukaani-project/xz.git"
 XZ_TAG="v5.8.4"
@@ -62,7 +62,7 @@ IMATH_REPO="https://github.com/AcademySoftwareFoundation/Imath.git"
 IMATH_TAG="v3.2.3"
 
 OPENEXR_REPO="https://github.com/AcademySoftwareFoundation/openexr.git"
-OPENEXR_TAG="v3.5.2"
+OPENEXR_TAG="v3.5.3"
 
 LIBDE265_REPO="https://github.com/strukturag/libde265.git"
 LIBDE265_TAG="v1.1.3"
