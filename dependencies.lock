@@ -2,7 +2,7 @@
 # Update with: ./update-dependency-lock.sh
 
 ZLIB_REPO="https://github.com/madler/zlib.git"
-ZLIB_TAG="v1.3.2"
+ZLIB_TAG="v1.4"
 
 LIBDEFLATE_REPO="https://github.com/ebiggers/libdeflate.git"
 LIBDEFLATE_TAG="v1.26"
