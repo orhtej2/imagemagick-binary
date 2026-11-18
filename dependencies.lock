@@ -86,4 +86,4 @@ LIBTIFF_REPO="https://gitlab.com/libtiff/libtiff.git"
 LIBTIFF_TAG="v4.7.2"
 
 FONTCONFIG_REPO="https://gitlab.freedesktop.org/fontconfig/fontconfig.git"
-FONTCONFIG_TAG="2.18.3"
+FONTCONFIG_TAG="2.18.4"
