@@ -17,7 +17,7 @@ BZIP2_REPO="https://github.com/libarchive/bzip2.git"
 BZIP2_TAG="bzip2-1.0.8"
 
 ZSTD_REPO="https://github.com/facebook/zstd.git"
-ZSTD_TAG="v1.5.7"
+ZSTD_TAG="v1.6.0"
 
 OPENJPEG_REPO="https://github.com/uclouvain/openjpeg.git"
 OPENJPEG_TAG="v2.5.4"
