@@ -41,10 +41,10 @@ PCRE2_REPO="https://github.com/PCRE2Project/pcre2.git"
 PCRE2_TAG="pcre2-10.49"
 
 LIBFFI_REPO="https://github.com/libffi/libffi.git"
-LIBFFI_TAG="v3.8.1"
+LIBFFI_TAG="v3.8.2"
 
 GLIB_REPO="https://github.com/GNOME/glib.git"
-GLIB_TAG="2.90.1"
+GLIB_TAG="2.90.2"
 
 GVDB_REPO="https://gitlab.gnome.org/GNOME/gvdb.git"
 GVDB_REF="c6f2359cc1d00f16e0a0e2527fa0bc1882b8b5ab"
